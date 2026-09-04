@@ -27,6 +27,9 @@ export const users = pgTable('users', {
   app_version: varchar('app_version', { length: 50 }),
   time_zone: varchar('time_zone', { length: 100 }),
   
+  // Role
+  role: varchar('role', { length: 50 }).default('Employee'),
+  
   // Account status
   status: varchar('status', { length: 20 }),
   
@@ -58,27 +61,7 @@ export const passwordResetTokens = pgTable('password_reset_tokens', {
   created_at: timestamp('created_at'),
 });
 
-export const admins = pgTable('admins', {
-  admin_id: uuid('admin_id').primaryKey().$defaultFn(() => crypto.randomUUID()),
-  email: varchar('email', { length: 255 }).notNull().unique(),
-  password: varchar('password', { length: 255 }).notNull(),
-  phone_number: varchar('phone_number', { length: 20 }),
-  country_code: varchar('country_code', { length: 10 }),
-  first_name: varchar('first_name', { length: 100 }).notNull(),
-  last_name: varchar('last_name', { length: 100 }).notNull(),
-  last_login: timestamp('last_login'),
-  // Password reset / OTP fields
-  password_reset_otp: varchar('password_reset_otp', { length: 20 }),
-  password_reset_otp_expires_at: timestamp('password_reset_otp_expires_at'),
-  password_reset_token: varchar('password_reset_token', { length: 255 }),
-  password_reset_token_expires_at: timestamp('password_reset_token_expires_at'),
-
-  created_at: timestamp('created_at'),
-  updated_at: timestamp('updated_at'),
-});
-
-export type Admin = InferSelectModel<typeof admins>;
-
 export type User = InferSelectModel<typeof users>;
+export type Admin = User;
 export type PasswordResetOtp = InferSelectModel<typeof passwordResetOtps>;
 export type PasswordResetToken = InferSelectModel<typeof passwordResetTokens>;

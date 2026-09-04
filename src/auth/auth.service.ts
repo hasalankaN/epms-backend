@@ -62,6 +62,7 @@ export class AuthService {
     const payload = {
       sub: user.user_id,
       email: user.email,
+      role: user.role,
     };
 
     const accessTokenExpiry = rememberMe ? '7d' : '24h';
@@ -153,6 +154,7 @@ export class AuthService {
       email: newUser.email,
       phoneNumber: newUser.phone_number,
       countryCode: newUser.country_code,
+      role: newUser.role,
     };
   }
 
@@ -253,6 +255,7 @@ export class AuthService {
         email: user.email,
         phoneNumber: user.phone_number,
         countryCode: user.country_code,
+        role: user.role,
         status: user.status,
       },
     };
@@ -341,6 +344,7 @@ export class AuthService {
         email: user!.email,
         phoneNumber: user!.phone_number,
         countryCode: user!.country_code,
+        role: user!.role,
         status: user!.status,
         firebaseUid: user!.firebase_uid,
         emailVerified: user!.email_verified,
@@ -396,6 +400,7 @@ export class AuthService {
         email: updatedUser!.email,
         phoneNumber: updatedUser!.phone_number,
         countryCode: updatedUser!.country_code,
+        role: updatedUser!.role,
         status: updatedUser!.status,
       },
     };

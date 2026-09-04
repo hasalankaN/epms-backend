@@ -21,11 +21,11 @@ export class EmailService {
     this.fromEmail =
       this.configService.get<string>('BREVO_SENDER_EMAIL') ||
       this.configService.get<string>('EMAIL_FROM') ||
-      'no-reply@fitness-coaching.example';
+      'no-reply@epms.example';
     this.fromName =
-      (this.configService.get<string>('BREVO_SENDER_NAME') || 
-       this.configService.get<string>('EMAIL_FROM_NAME'))?.replace(/"/g, '') ||
-      'Fitness Coaching';
+      (this.configService.get<string>('BREVO_SENDER_NAME') ||
+        this.configService.get<string>('EMAIL_FROM_NAME'))?.replace(/"/g, '') ||
+      'EPMS';
 
     this.isConfigured = !!apiKey;
 
@@ -224,7 +224,7 @@ export class EmailService {
           </div>
           <div class="email-footer">
             <div class="footer-text">
-              © ${new Date().getFullYear()} Fitness Coaching. All rights reserved.<br>
+              © ${new Date().getFullYear()} Employee Managment System. All rights reserved.<br>
               This email was sent to you as part of your account activity.
             </div>
             <div class="divider"></div>

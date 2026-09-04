@@ -3,7 +3,8 @@ import crypto from 'crypto';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, sql } from 'drizzle-orm';
+import { eq, sql, and } from 'drizzle-orm';
+import * as bcrypt from 'bcrypt';
 import * as schema from '../database/schema';
 import { DATABASE_CONNECTION } from '../database/database.module';
 import { EmailService } from '../email/email.service';
@@ -21,8 +22,13 @@ export class AdminService {
     private readonly emailService: EmailService,
   ) {}
 
-  private generateTokens(admin: schema.Admin, rememberMe: boolean = false) {
-    const payload = { sub: admin.admin_id, email: admin.email };
+  private hashOtp(otp: string): string {
+    const secret = this.configService.get<string>('OTP_SECRET') || 'default-secret';
+    return crypto.createHmac('sha256', secret).update(otp).digest('hex');
+  }
+
+  private generateTokens(user: schema.User, rememberMe: boolean = false) {
+    const payload = { sub: user.user_id, email: user.email, role: user.role };
     const accessTokenExpiry = rememberMe ? '7d' : '24h';
 
     return {
@@ -38,65 +44,88 @@ export class AdminService {
   }
 
   async login(email: string, password: string, rememberMe: boolean = false) {
-    let admin: schema.Admin | undefined;
+    let user: schema.User | undefined;
     try {
-      admin = await this.db.query.admins.findFirst({ where: eq(schema.admins.email, email) });
+      user = await this.db.query.users.findFirst({ where: eq(schema.users.email, email) });
     } catch (err) {
       console.error('[AdminService][login] DB query error:', err);
       throw new InternalServerErrorException('Database error while fetching admin');
     }
-    if (!admin) {
+    if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // NOTE: password stored in plain text as requested
-    if (admin.password !== password) {
+    // Check admin role
+    if (!user.role || user.role.toLowerCase() !== 'admin') {
+      throw new UnauthorizedException('Access denied. Admin privileges required.');
+    }
+
+    // Password validation: bcrypt check with fallback to plain text if legacy
+    let isPasswordValid = false;
+    if (user.password_hash) {
+      try {
+        isPasswordValid = await bcrypt.compare(password, user.password_hash);
+      } catch (e) {
+        isPasswordValid = false;
+      }
+      if (!isPasswordValid && user.password_hash === password) {
+        isPasswordValid = true;
+      }
+    }
+
+    if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
     // Update last login
-    await this.db.update(schema.admins).set({ last_login: new Date() }).where(eq(schema.admins.admin_id, admin.admin_id));
+    await this.db.update(schema.users).set({ last_login: new Date() }).where(eq(schema.users.user_id, user.user_id));
 
-    const tokens = this.generateTokens(admin, rememberMe);
+    const tokens = this.generateTokens(user, rememberMe);
 
     return {
       ...tokens,
       admin: {
-        adminId: admin.admin_id,
-        email: admin.email,
-        firstName: admin.first_name,
-        lastName: admin.last_name,
-        phoneNumber: admin.phone_number,
-        countryCode: admin.country_code,
-        lastLogin: admin.last_login,
+        adminId: user.user_id,
+        email: user.email,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        phoneNumber: user.phone_number,
+        countryCode: user.country_code,
+        role: user.role,
+        lastLogin: user.last_login,
       },
     };
   }
 
   async register(dto: AdminRegisterDto) {
     // check existing
-    let existing: schema.Admin | undefined;
+    let existing: schema.User | undefined;
     try {
-      existing = await this.db.query.admins.findFirst({ where: eq(schema.admins.email, dto.email) });
+      existing = await this.db.query.users.findFirst({ where: eq(schema.users.email, dto.email) });
     } catch (err) {
-      console.error('[AdminService][register] DB query error while checking existing admin:', err);
-      throw new InternalServerErrorException('Database error while checking existing admin');
+      console.error('[AdminService][register] DB query error while checking existing user:', err);
+      throw new InternalServerErrorException('Database error while checking existing user');
     }
 
     if (existing) {
-      throw new BadRequestException('Admin with this email already exists');
+      throw new BadRequestException('User with this email already exists');
     }
 
-    // insert admin (password stored in plain text per request)
-    let created: schema.Admin;
+    // hash password with bcrypt
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+
+    let created: schema.User;
     try {
-      const res = await this.db.insert(schema.admins).values({
+      const res = await this.db.insert(schema.users).values({
         email: dto.email,
-        password: dto.password,
+        password_hash: passwordHash,
         phone_number: dto.phoneNumber || null,
         country_code: dto.countryCode || null,
         first_name: dto.firstName,
         last_name: dto.lastName,
+        role: 'admin',
+        status: 'Active',
+        email_verified: true,
       }).returning();
       [created] = res;
     } catch (err) {
@@ -127,21 +156,20 @@ export class AdminService {
 
     return {
       message: 'Admin registered successfully',
-      adminId: created.admin_id,
+      adminId: created.user_id,
       email: created.email,
     };
   }
 
   async updateDetails(adminId: string, dto: AdminUpdateDto) {
-    // find admin
-    let admin: schema.Admin | undefined;
+    let user: schema.User | undefined;
     try {
-      admin = await this.db.query.admins.findFirst({ where: eq(schema.admins.admin_id, adminId) });
+      user = await this.db.query.users.findFirst({ where: eq(schema.users.user_id, adminId) });
     } catch (err) {
       console.error('[AdminService][updateDetails] DB query error:', err);
       throw new InternalServerErrorException('Database error while fetching admin');
     }
-    if (!admin) {
+    if (!user) {
       throw new BadRequestException('Admin not found');
     }
 
@@ -154,43 +182,43 @@ export class AdminService {
     updateData.updated_at = new Date();
 
     try {
-      await this.db.update(schema.admins).set(updateData).where(eq(schema.admins.admin_id, adminId));
+      await this.db.update(schema.users).set(updateData).where(eq(schema.users.user_id, adminId));
     } catch (err) {
       console.error('[AdminService][updateDetails] DB update error:', err);
       throw new InternalServerErrorException('Database error while updating admin');
     }
 
-    const updated = await this.db.query.admins.findFirst({ where: eq(schema.admins.admin_id, adminId) });
+    const updated = await this.db.query.users.findFirst({ where: eq(schema.users.user_id, adminId) });
     return {
       message: 'Admin updated successfully',
       admin: {
-        adminId: updated!.admin_id,
+        adminId: updated!.user_id,
         email: updated!.email,
         firstName: updated!.first_name,
         lastName: updated!.last_name,
         phoneNumber: updated!.phone_number,
         countryCode: updated!.country_code,
+        role: updated!.role,
         lastLogin: updated!.last_login,
       },
     };
   }
 
   async updatePassword(adminId: string, dto: AdminUpdatePasswordDto) {
-    // find admin
-    let admin: schema.Admin | undefined;
+    let user: schema.User | undefined;
     try {
-      admin = await this.db.query.admins.findFirst({ where: eq(schema.admins.admin_id, adminId) });
+      user = await this.db.query.users.findFirst({ where: eq(schema.users.user_id, adminId) });
     } catch (err) {
       console.error('[AdminService][updatePassword] DB query error:', err);
       throw new InternalServerErrorException('Database error while fetching admin');
     }
-    if (!admin) {
+    if (!user) {
       throw new BadRequestException('Admin not found');
     }
 
-    // Update password (plain text as requested)
+    const passwordHash = await bcrypt.hash(dto.newPassword, 10);
     try {
-      await this.db.update(schema.admins).set({ password: dto.newPassword, updated_at: new Date() }).where(eq(schema.admins.admin_id, adminId));
+      await this.db.update(schema.users).set({ password_hash: passwordHash, updated_at: new Date() }).where(eq(schema.users.user_id, adminId));
     } catch (err) {
       console.error('[AdminService][updatePassword] DB update error:', err);
       throw new InternalServerErrorException('Database error while updating password');
@@ -199,7 +227,7 @@ export class AdminService {
     // Send email with new password
     const content = `
       <div class="email-content">
-        <p>Hi ${admin.first_name},</p>
+        <p>Hi ${user.first_name},</p>
         <p>Your admin account password has been updated.</p>
         <div class="info-box">
           <p><strong>New Password</strong></p>
@@ -212,13 +240,12 @@ export class AdminService {
 
     try {
       await this.emailService.sendCustomEmail({
-        to: admin.email,
+        to: user.email,
         subject: 'Your Admin Account Password Has Been Updated - Fitness Coaching',
         htmlContent: this.emailService['getEmailTemplate'] ? (this.emailService as any).getEmailTemplate(content) : content,
       });
     } catch (err) {
       console.error('[AdminService][updatePassword] Email send error:', err);
-      // do not fail the request if email sending fails
     }
 
     return {
@@ -227,30 +254,28 @@ export class AdminService {
   }
 
   async sendPasswordOtp(email: string) {
-    // find admin
-    let admin: schema.Admin | undefined;
+    let user: schema.User | undefined;
     try {
-      admin = await this.db.query.admins.findFirst({ where: eq(schema.admins.email, email) });
+      user = await this.db.query.users.findFirst({ where: eq(schema.users.email, email) });
     } catch (err) {
       console.error('[AdminService][sendPasswordOtp] DB query error:', err);
       throw new InternalServerErrorException('Database error while fetching admin');
     }
 
-    if (!admin) {
-      // For security, don't reveal that email doesn't exist
+    if (!user || !user.role || user.role.toLowerCase() !== 'admin') {
       return { message: 'If an account exists for this email, an OTP has been sent' };
     }
 
-    // generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpHash = this.hashOtp(otp);
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     try {
-      await this.db.update(schema.admins).set({
-        password_reset_otp: otp,
-        password_reset_otp_expires_at: expiresAt,
-        updated_at: new Date(),
-      }).where(eq(schema.admins.admin_id, admin.admin_id));
+      await this.db.insert(schema.passwordResetOtps).values({
+        email: user.email,
+        otp_hash: otpHash,
+        expires_at: expiresAt,
+      });
     } catch (err) {
       console.error('[AdminService][sendPasswordOtp] DB update error:', err);
       throw new InternalServerErrorException('Database error while storing OTP');
@@ -259,7 +284,7 @@ export class AdminService {
     // send email with OTP
     const content = `
       <div class="email-content">
-        <p>Hi ${admin.first_name},</p>
+        <p>Hi ${user.first_name},</p>
         <p>Use the following One-Time Password (OTP) to reset your password. It expires in 10 minutes.</p>
         <div class="info-box">
           <p style="font-size: 20px; font-weight: 700;">${otp}</p>
@@ -271,83 +296,121 @@ export class AdminService {
 
     try {
       await this.emailService.sendCustomEmail({
-        to: admin.email,
+        to: user.email,
         subject: 'Your Password Reset OTP - Fitness Coaching',
         htmlContent: this.emailService['getEmailTemplate'] ? (this.emailService as any).getEmailTemplate(content) : content,
       });
     } catch (err) {
       console.error('[AdminService][sendPasswordOtp] Email send error:', err);
-      // don't fail the flow if email fails - still return generic message
     }
 
     return { message: 'If an account exists for this email, an OTP has been sent' };
   }
 
   async confirmPasswordOtp(email: string, otp: string) {
-    let admin: schema.Admin | undefined;
-    try {
-      admin = await this.db.query.admins.findFirst({ where: eq(schema.admins.email, email) });
-    } catch (err) {
-      console.error('[AdminService][confirmPasswordOtp] DB query error:', err);
-      throw new InternalServerErrorException('Database error while fetching admin');
-    }
-
-    if (!admin || !admin.password_reset_otp || !admin.password_reset_otp_expires_at) {
+    const user = await this.db.query.users.findFirst({ where: eq(schema.users.email, email) });
+    if (!user || !user.role || user.role.toLowerCase() !== 'admin') {
       throw new BadRequestException('Invalid or expired OTP');
     }
 
-    const now = new Date();
-    if (admin.password_reset_otp !== otp || new Date(admin.password_reset_otp_expires_at) < now) {
+    const otpRecords = await this.db
+      .select()
+      .from(schema.passwordResetOtps)
+      .where(
+        and(
+          eq(schema.passwordResetOtps.email, email),
+          eq(schema.passwordResetOtps.is_used, false),
+        ),
+      )
+      .orderBy(schema.passwordResetOtps.created_at);
+
+    if (otpRecords.length === 0) {
       throw new BadRequestException('Invalid or expired OTP');
     }
 
-    // generate a one-time reset token and store it, clear otp
+    const otpRecord = otpRecords[otpRecords.length - 1];
+
+    if (new Date() > otpRecord.expires_at) {
+      throw new BadRequestException('Invalid or expired OTP');
+    }
+
+    const attempts = otpRecord.attempts || 0;
+    if (attempts >= 5) {
+      throw new BadRequestException('Too many attempts. Please request a new OTP.');
+    }
+
+    const otpHash = this.hashOtp(otp);
+    if (otpHash !== otpRecord.otp_hash) {
+      await this.db
+        .update(schema.passwordResetOtps)
+        .set({ attempts: attempts + 1 })
+        .where(eq(schema.passwordResetOtps.id, otpRecord.id));
+      throw new BadRequestException('Invalid or expired OTP');
+    }
+
+    // generate a one-time reset token and store it
     const resetToken = crypto.randomBytes(32).toString('hex');
     const tokenExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
     try {
-      await this.db.update(schema.admins).set({
-        password_reset_otp: null,
-        password_reset_otp_expires_at: null,
-        password_reset_token: resetToken,
-        password_reset_token_expires_at: tokenExpiresAt,
-        updated_at: new Date(),
-      }).where(eq(schema.admins.admin_id, admin.admin_id));
+      await this.db.insert(schema.passwordResetTokens).values({
+        email,
+        token: resetToken,
+        associated_otp_id: otpRecord.id,
+        expires_at: tokenExpiresAt,
+      });
     } catch (err) {
-      console.error('[AdminService][confirmPasswordOtp] DB update error:', err);
+      console.error('[AdminService][confirmPasswordOtp] DB error:', err);
       throw new InternalServerErrorException('Database error while creating reset token');
     }
 
-    // return reset token to client (short lived)
     return { message: 'OTP confirmed', resetToken };
   }
 
   async resetPassword(email: string, resetToken: string, newPassword: string) {
-    let admin: schema.Admin | undefined;
-    try {
-      admin = await this.db.query.admins.findFirst({ where: eq(schema.admins.email, email) });
-    } catch (err) {
-      console.error('[AdminService][resetPassword] DB query error:', err);
-      throw new InternalServerErrorException('Database error while fetching admin');
-    }
+    const tokenRecord = await this.db.query.passwordResetTokens.findFirst({
+      where: and(
+        eq(schema.passwordResetTokens.email, email),
+        eq(schema.passwordResetTokens.token, resetToken),
+        eq(schema.passwordResetTokens.is_used, false),
+      ),
+    });
 
-    if (!admin || !admin.password_reset_token || !admin.password_reset_token_expires_at) {
+    if (!tokenRecord) {
       throw new BadRequestException('Invalid or expired reset token');
     }
 
-    const now = new Date();
-    if (admin.password_reset_token !== resetToken || new Date(admin.password_reset_token_expires_at) < now) {
-      throw new BadRequestException('Invalid or expired reset token');
+    if (new Date() > tokenRecord.expires_at) {
+      throw new BadRequestException('Reset token has expired');
     }
 
-    // Update password and clear token
+    const user = await this.db.query.users.findFirst({
+      where: eq(schema.users.email, email),
+    });
+
+    if (!user || !user.role || user.role.toLowerCase() !== 'admin') {
+      throw new BadRequestException('Admin account not found');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
     try {
-      await this.db.update(schema.admins).set({
-        password: newPassword,
-        password_reset_token: null,
-        password_reset_token_expires_at: null,
+      await this.db.update(schema.users).set({
+        password_hash: passwordHash,
         updated_at: new Date(),
-      }).where(eq(schema.admins.admin_id, admin.admin_id));
+      }).where(eq(schema.users.user_id, user.user_id));
+
+      await this.db
+        .update(schema.passwordResetTokens)
+        .set({ is_used: true })
+        .where(eq(schema.passwordResetTokens.id, tokenRecord.id));
+
+      if (tokenRecord.associated_otp_id) {
+        await this.db
+          .update(schema.passwordResetOtps)
+          .set({ is_used: true })
+          .where(eq(schema.passwordResetOtps.id, tokenRecord.associated_otp_id));
+      }
     } catch (err) {
       console.error('[AdminService][resetPassword] DB update error:', err);
       throw new InternalServerErrorException('Database error while resetting password');
@@ -356,7 +419,7 @@ export class AdminService {
     // send notification email
     const content = `
       <div class="email-content">
-        <p>Hi ${admin.first_name},</p>
+        <p>Hi ${user.first_name},</p>
         <p>Your admin account password has been reset successfully.</p>
         <p>If you did not request this change, please contact support immediately.</p>
         <p style="margin-top:20px;">Best regards,<br/><strong style="color: #7F435F;">The Fitness Coaching Team</strong></p>
@@ -365,7 +428,7 @@ export class AdminService {
 
     try {
       await this.emailService.sendCustomEmail({
-        to: admin.email,
+        to: user.email,
         subject: 'Your Password Has Been Reset - Fitness Coaching',
         htmlContent: this.emailService['getEmailTemplate'] ? (this.emailService as any).getEmailTemplate(content) : content,
       });
@@ -381,24 +444,24 @@ export class AdminService {
     const pageSize = query.pageSize || 10;
     const offset = (page - 1) * pageSize;
 
-    // Build filter SQL
-    let whereSql = sql`TRUE`;
+    // Build filter SQL - only fetch users where role is admin
+    let whereSql = sql`LOWER("role") = 'admin'`;
     if (query.search && query.search.trim().length > 0) {
       const s = `%${query.search.trim()}%`;
       whereSql = sql`
-        ("first_name" ILIKE ${s} OR "last_name" ILIKE ${s} OR "email" ILIKE ${s})
+        ${whereSql} AND ("first_name" ILIKE ${s} OR "last_name" ILIKE ${s} OR "email" ILIKE ${s})
       `;
     }
 
     try {
       // total count
-      const countRes = await this.db.execute(sql`SELECT COUNT(*)::int AS count FROM admins WHERE ${whereSql}`);
+      const countRes = await this.db.execute(sql`SELECT COUNT(*)::int AS count FROM users WHERE ${whereSql}`);
       const total = (countRes.rows && countRes.rows[0] && Number(countRes.rows[0].count)) || 0;
 
       // fetch page
       const res = await this.db.execute(sql`
-        SELECT admin_id, email, phone_number, country_code, first_name, last_name, last_login, created_at, updated_at
-        FROM admins
+        SELECT user_id AS admin_id, user_id, email, phone_number, country_code, first_name, last_name, role, status, last_login, created_at, updated_at
+        FROM users
         WHERE ${whereSql}
         ORDER BY created_at DESC
         LIMIT ${pageSize} OFFSET ${offset}

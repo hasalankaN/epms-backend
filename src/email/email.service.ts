@@ -246,7 +246,7 @@ export class EmailService {
     const content = `
       <div class="email-content">
         <p>Hi${name ? ' ' + name : ''},</p>
-        <p>Thank you for joining <strong>Fitness Coaching</strong>! We're excited to have you on board.</p>
+        <p>Thank you for joining <strong>SourceCode</strong>! We're excited to have you on board.</p>
         <p>To complete your registration and verify your email address, please use the verification code below:</p>
       </div>
       
@@ -261,11 +261,11 @@ export class EmailService {
       </div>
       
       <div class="email-content">
-        <p>If you didn't create an account with Fitness Coaching, please ignore this email or contact our support team if you have concerns.</p>
+        <p>If you didn't create an account with SourceCode, please ignore this email or contact our support team if you have concerns.</p>
         <p>Welcome to your fitness journey!</p>
         <p style="margin-top: 30px;">
           Best regards,<br>
-          <strong style="color: #7F435F;">The Fitness Coaching Team</strong>
+          <strong style="color: #7F435F;">The SourceCode Team</strong>
         </p>
       </div>
     `;
@@ -273,7 +273,7 @@ export class EmailService {
     await this.sendEmail({
       to: email,
       toName: name,
-      subject: '🔐 Verify Your Email Address - Fitness Coaching',
+      subject: '🔐 Verify Your Email Address - EPMS',
       htmlContent: this.getEmailTemplate(content),
     });
   }
@@ -303,7 +303,7 @@ export class EmailService {
         <p>Once you enter this code, you'll be able to create a new password for your account.</p>
         <p style="margin-top: 30px;">
           Best regards,<br>
-          <strong style="color: #7F435F;">The Fitness Coaching Team</strong>
+          <strong style="color: #7F435F;">SourceCode Team</strong>
         </p>
       </div>
     `;
@@ -311,7 +311,7 @@ export class EmailService {
     await this.sendEmail({
       to: email,
       toName: name,
-      subject: '🔑 Reset Your Password - Fitness Coaching',
+      subject: '🔑 Reset Your Password - SourceCode',
       htmlContent: this.getEmailTemplate(content),
     });
   }
@@ -324,7 +324,7 @@ export class EmailService {
       <div class="email-content">
         <p>Hi ${name},</p>
         <p>🎉 <strong>Congratulations!</strong> Your email has been successfully verified, and your account is now active.</p>
-        <p>You're all set to start your fitness transformation journey with <strong>Fitness Coaching</strong>!</p>
+        <p>You're all set to start your fitness transformation journey with <strong>SourceCode</strong>!</p>
       </div>
       
       <div style="text-align: center; margin: 30px 0;">
@@ -371,7 +371,7 @@ export class EmailService {
     const content = `
       <div class="email-content">
         <p>Hi${name ? ' ' + name : ''},</p>
-        <p>This email confirms that your password for <strong>Fitness Coaching</strong> has been successfully changed.</p>
+        <p>This email confirms that your password for <strong>SourceCode</strong> has been successfully changed.</p>
       </div>
       
       <div class="info-box">
@@ -392,7 +392,7 @@ export class EmailService {
         <p>If you have any concerns or questions about your account security, please reach out to our support team.</p>
         <p style="margin-top: 30px;">
           Stay secure,<br>
-          <strong style="color: #7F435F;">The Fitness Coaching Team</strong>
+          <strong style="color: #7F435F;">SourceCode Team</strong>
         </p>
       </div>
     `;
@@ -400,7 +400,7 @@ export class EmailService {
     await this.sendEmail({
       to: email,
       toName: name,
-      subject: '✅ Your Password Has Been Changed - Fitness Coaching',
+      subject: '✅ Your Password Has Been Changed - SourceCode',
       htmlContent: this.getEmailTemplate(content),
     });
   }

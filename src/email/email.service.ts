@@ -216,8 +216,8 @@ export class EmailService {
       <body>
         <div class="email-container">
           <div class="email-header">
-            <div class="email-logo">Fitness Coaching</div>
-            <div class="email-tagline">Transform Your Body, Transform Your Life</div>
+            <div class="email-logo">SourceCode</div>
+            <div class="email-tagline">Employee Managment System</div>
           </div>
           <div class="email-body">
             ${content}

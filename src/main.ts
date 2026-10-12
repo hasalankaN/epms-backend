@@ -23,7 +23,7 @@ async function bootstrap() {
 
   // Swagger documentation
   const config = new DocumentBuilder()
-    .setTitle('Fitness Coaching API')
+    .setTitle('Employee Management System API')
     .setDescription('API documentation for Fitness Coaching platform')
     .setVersion('1.0')
     .addBearerAuth()

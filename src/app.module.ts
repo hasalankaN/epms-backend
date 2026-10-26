@@ -11,6 +11,8 @@ import { FilesModule } from './files/files.module';
 import { EmployeeModule } from './employee/employee.module';
 import { DepartmentModule } from './departments/department.module';
 import { PositionsModule } from './positions/positions.module';
+import { HrModule } from './hr/hr.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -27,6 +29,8 @@ import { PositionsModule } from './positions/positions.module';
     EmployeeModule,
     DepartmentModule,
     PositionsModule,
+    HrModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

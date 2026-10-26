@@ -1,18 +1,21 @@
-import { Injectable, UnauthorizedException, Inject, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, Inject, BadRequestException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import crypto from 'crypto';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, sql, and } from 'drizzle-orm';
+import { eq, sql, and, or, count, desc, ilike, SQL } from 'drizzle-orm';
 import * as bcrypt from 'bcrypt';
 import * as schema from '../database/schema';
 import { getAppName } from '../common/app-name';
 import { DATABASE_CONNECTION } from '../database/database.module';
 import { EmailService } from '../email/email.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { AdminRegisterDto } from './dto/admin-register.dto';
 import { AdminUpdateDto } from './dto/admin-update.dto';
 import { AdminUpdatePasswordDto } from './dto/admin-update-password.dto';
 import { AdminQueryDto } from './dto/admin-query.dto';
+import { AdminEmployeeRequestQueryDto } from './dto/admin-employee-request-query.dto';
+import { generateEmployeeNo } from '../common/utils/code-generator.util';
 
 @Injectable()
 export class AdminService {
@@ -21,6 +24,7 @@ export class AdminService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly emailService: EmailService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   private hashOtp(otp: string): string {
@@ -484,4 +488,451 @@ export class AdminService {
       throw new InternalServerErrorException('Database error while listing admins');
     }
   }
+
+  private generateTemporaryEmployeePassword(length = 10): string {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+    let password = '';
+    for (let i = 0; i < length; i++) {
+      const randomIndex = crypto.randomInt(0, chars.length);
+      password += chars[randomIndex];
+    }
+    return password;
+  }
+
+  async listEmployeeRequests(query: AdminEmployeeRequestQueryDto) {
+    const page = query.page || 1;
+    const pageSize = query.pageSize || 10;
+    const offset = (page - 1) * pageSize;
+
+    try {
+      const conditions: SQL[] = [];
+
+      if (query.status && query.status.trim().length > 0) {
+        conditions.push(eq(schema.employeeAccountRequests.status, query.status.toUpperCase()));
+      }
+
+      if (query.search && query.search.trim().length > 0) {
+        const pattern = `%${query.search.trim()}%`;
+        conditions.push(
+          or(
+            ilike(schema.employeeAccountRequests.employee_no, pattern),
+            ilike(schema.employeeAccountRequests.first_name, pattern),
+            ilike(schema.employeeAccountRequests.last_name, pattern),
+            ilike(schema.employeeAccountRequests.epf_no, pattern),
+            ilike(schema.employeeAccountRequests.work_email, pattern),
+          )!,
+        );
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const [{ totalCount }] = await this.db
+        .select({ totalCount: count() })
+        .from(schema.employeeAccountRequests)
+        .where(whereClause);
+
+      const total = Number(totalCount) || 0;
+
+      const rows = await this.db
+        .select({
+          request: schema.employeeAccountRequests,
+          department: {
+            department_id: schema.departments.departmentId,
+            department_code: schema.departments.departmentCode,
+            department_name: schema.departments.departmentName,
+            location: schema.departments.location,
+          },
+          position: {
+            position_id: schema.positions.position_id,
+            position_code: schema.positions.position_code,
+            position_name: schema.positions.position_name,
+          },
+          requestedBy: {
+            user_id: schema.users.user_id,
+            first_name: schema.users.first_name,
+            last_name: schema.users.last_name,
+            email: schema.users.email,
+          },
+          reviewedBy: {
+            user_id: schema.users.user_id,
+            first_name: schema.users.first_name,
+            last_name: schema.users.last_name,
+            email: schema.users.email,
+          },
+        })
+        .from(schema.employeeAccountRequests)
+        .leftJoin(
+          schema.departments,
+          eq(schema.employeeAccountRequests.departmentId, schema.departments.departmentId),
+        )
+        .leftJoin(
+          schema.positions,
+          eq(schema.employeeAccountRequests.position_id, schema.positions.position_id),
+        )
+        .leftJoin(
+          schema.users,
+          eq(schema.employeeAccountRequests.requested_by, schema.users.user_id),
+        )
+        .where(whereClause)
+        .orderBy(desc(schema.employeeAccountRequests.created_at))
+        .limit(pageSize)
+        .offset(offset);
+
+      const data = rows.map((r) => ({
+        ...r.request,
+        department: r.department?.department_id ? r.department : null,
+        position: r.position?.position_id ? r.position : null,
+        requestedBy: r.requestedBy?.user_id ? r.requestedBy : null,
+      }));
+
+      return {
+        data,
+        meta: {
+          total,
+          page,
+          pageSize,
+          totalPages: Math.ceil(total / pageSize),
+        },
+      };
+    } catch (err) {
+      console.error('[AdminService][listEmployeeRequests] DB error:', err);
+      throw new InternalServerErrorException('Database error while listing employee requests');
+    }
+  }
+
+  async getEmployeeRequestById(id: string) {
+    try {
+      const rows = await this.db
+        .select({
+          request: schema.employeeAccountRequests,
+          department: {
+            department_id: schema.departments.departmentId,
+            department_code: schema.departments.departmentCode,
+            department_name: schema.departments.departmentName,
+            location: schema.departments.location,
+            dept_phone: schema.departments.deptPhone,
+          },
+          position: {
+            position_id: schema.positions.position_id,
+            position_code: schema.positions.position_code,
+            position_name: schema.positions.position_name,
+            description: schema.positions.description,
+          },
+          requestedBy: {
+            user_id: schema.users.user_id,
+            first_name: schema.users.first_name,
+            last_name: schema.users.last_name,
+            email: schema.users.email,
+            role: schema.users.role,
+          },
+        })
+        .from(schema.employeeAccountRequests)
+        .leftJoin(
+          schema.departments,
+          eq(schema.employeeAccountRequests.departmentId, schema.departments.departmentId),
+        )
+        .leftJoin(
+          schema.positions,
+          eq(schema.employeeAccountRequests.position_id, schema.positions.position_id),
+        )
+        .leftJoin(
+          schema.users,
+          eq(schema.employeeAccountRequests.requested_by, schema.users.user_id),
+        )
+        .where(eq(schema.employeeAccountRequests.id, id));
+
+      if (!rows || rows.length === 0) {
+        throw new NotFoundException('Employee account request not found');
+      }
+
+      const row = rows[0];
+      return {
+        ...row.request,
+        department: row.department?.department_id ? row.department : null,
+        position: row.position?.position_id ? row.position : null,
+        requestedBy: row.requestedBy?.user_id ? row.requestedBy : null,
+      };
+    } catch (err) {
+      if (err instanceof NotFoundException) throw err;
+      console.error('[AdminService][getEmployeeRequestById] DB error:', err);
+      throw new InternalServerErrorException('Database error while fetching employee request');
+    }
+  }
+
+  async acceptEmployeeRequest(id: string, adminUserId: string) {
+    const request = await this.db.query.employeeAccountRequests.findFirst({
+      where: eq(schema.employeeAccountRequests.id, id),
+    });
+
+    if (!request) {
+      throw new NotFoundException('Employee account request not found');
+    }
+
+    if (request.status !== 'PENDING') {
+      throw new BadRequestException(`Request cannot be accepted because it is already ${request.status}`);
+    }
+
+    // Check existing user by email
+    const existingUser = await this.db.query.users.findFirst({
+      where: eq(schema.users.email, request.work_email),
+    });
+    if (existingUser) {
+      throw new BadRequestException('A user with this work email already exists');
+    }
+
+    // Check existing employee by EPF
+    const existingEmployee = await this.db.query.employees.findFirst({
+      where: eq(schema.employees.epf_no, request.epf_no),
+    });
+    if (existingEmployee) {
+      throw new BadRequestException('An employee with this EPF number already exists');
+    }
+
+    // Check or generate readable Employee No (EMP-0001, etc.)
+    let employeeNo = request.employee_no?.trim();
+    if (employeeNo) {
+      const existingEmpNo = await this.db.query.employees.findFirst({
+        where: eq(schema.employees.employee_no, employeeNo),
+      });
+      if (existingEmpNo) {
+        employeeNo = await generateEmployeeNo(this.db);
+      }
+    } else {
+      employeeNo = await generateEmployeeNo(this.db);
+    }
+
+    const plainPassword = this.generateTemporaryEmployeePassword(10);
+    const passwordHash = await bcrypt.hash(plainPassword, 10);
+
+    let result: { user: schema.User; employee: schema.Employee };
+    try {
+      result = await this.db.transaction(async (tx) => {
+        // 1. Create User
+        const userRes = await tx
+          .insert(schema.users)
+          .values({
+            email: request.work_email,
+            password_hash: passwordHash,
+            first_name: request.first_name,
+            last_name: request.last_name,
+            phone_number: request.mobile_no || null,
+            role: request.role || 'employee',
+            status: 'Active',
+            email_verified: true,
+          })
+          .returning();
+        const createdUser = userRes[0];
+
+        // 2. Create Employee
+        const employeeRes = await tx
+          .insert(schema.employees)
+          .values({
+            user_id: createdUser.user_id,
+            employee_no: employeeNo,
+            epf_no: request.epf_no,
+            first_name: request.first_name,
+            last_name: request.last_name,
+            dob: request.dob,
+            join_date: request.join_date,
+            work_email: request.work_email,
+            personal_email: request.personal_email || null,
+            mobile_no: request.mobile_no || null,
+            home_tp: request.home_tp || null,
+            street: request.street || null,
+            city: request.city || null,
+            province: request.province || null,
+            country: request.country || null,
+            departmentId: request.departmentId || null,
+            position_id: request.position_id || null,
+            supervisor_id: request.supervisor_id || null,
+          })
+          .returning();
+        const createdEmployee = employeeRes[0];
+
+        // 3. Update department count
+        if (request.departmentId) {
+          await tx
+            .update(schema.departments)
+            .set({
+              noOfEmployees: sql`COALESCE(${schema.departments.noOfEmployees}, 0) + 1`,
+            })
+            .where(eq(schema.departments.departmentId, request.departmentId));
+        }
+
+        // 4. Insert emergency contacts if provided
+        const emergencyContacts = request.emergency_contacts as any[];
+        if (Array.isArray(emergencyContacts) && emergencyContacts.length > 0) {
+          await tx.insert(schema.empEmergencyContacts).values(
+            emergencyContacts.map((contact) => ({
+              employee_id: createdEmployee.employee_id,
+              name: contact.name,
+              relationship: contact.relationship,
+              mobile: contact.mobile,
+              home_tp: contact.home_tp || null,
+              work_tp: contact.work_tp || null,
+            })),
+          );
+        }
+
+        // 5. Insert qualifications if provided
+        const qualifications = request.qualifications as any[];
+        if (Array.isArray(qualifications) && qualifications.length > 0) {
+          await tx.insert(schema.empQualifications).values(
+            qualifications.map((qual) => ({
+              employee_id: createdEmployee.employee_id,
+              qualification_title: qual.qualification_title,
+              institute: qual.institute || null,
+              completed_year: qual.completed_year || null,
+            })),
+          );
+        }
+
+        // 6. Insert dependents if provided
+        const dependents = request.dependents as any[];
+        if (Array.isArray(dependents) && dependents.length > 0) {
+          await tx.insert(schema.empDependents).values(
+            dependents.map((dep) => ({
+              employee_id: createdEmployee.employee_id,
+              name: dep.name,
+              relationship: dep.relationship,
+              dob: dep.dob || null,
+              mobile: dep.mobile || null,
+            })),
+          );
+        }
+
+        // 7. Update request status to APPROVED
+        await tx
+          .update(schema.employeeAccountRequests)
+          .set({
+            status: 'APPROVED',
+            reviewed_by: adminUserId || null,
+            reviewed_at: new Date(),
+            updated_at: new Date(),
+          })
+          .where(eq(schema.employeeAccountRequests.id, id));
+
+        return { user: createdUser, employee: createdEmployee };
+      });
+    } catch (err) {
+      console.error('[AdminService][acceptEmployeeRequest] Transaction error:', err);
+      throw new InternalServerErrorException('Failed to process employee account approval');
+    }
+
+    // 8. Send credentials email to employee
+    const emailContent = `
+      <div class="email-content">
+        <p>Hi ${result.user.first_name},</p>
+        <p>Your employee account has been approved and created.</p>
+        <div class="info-box" style="background:#f4f4f4; padding:15px; border-radius:5px; margin:15px 0;">
+          <p><strong>Login Credentials</strong></p>
+          <p>Employee No: <strong>${result.employee.employee_no}</strong></p>
+          <p>EPF No: <strong>${result.employee.epf_no}</strong></p>
+          <p>Email: <strong>${result.user.email}</strong></p>
+          <p>Temporary Password: <strong>${plainPassword}</strong></p>
+        </div>
+        <p>Please log in and update your password immediately.</p>
+        <p style="margin-top:20px;">Best regards,<br/><strong>Administration Team</strong></p>
+      </div>
+    `;
+
+    try {
+      await this.emailService.sendCustomEmail({
+        to: result.user.email,
+        subject: 'Employee Account Approved - Login Credentials',
+        htmlContent: this.emailService['getEmailTemplate']
+          ? (this.emailService as any).getEmailTemplate(emailContent)
+          : emailContent,
+      });
+    } catch (emailErr) {
+      console.error('[AdminService][acceptEmployeeRequest] Email error:', emailErr);
+    }
+
+    // 9. Send notification to HR requester
+    if (request.requested_by) {
+      try {
+        await this.notificationsService.create({
+          recipient_id: request.requested_by,
+          title: 'Employee Request Approved',
+          message: `The employee account request for ${request.first_name} ${request.last_name} (${result.employee.employee_no || request.epf_no}) has been approved by Admin.`,
+          type: 'REQUEST_APPROVED',
+          data: {
+            requestId: request.id,
+            employeeId: result.employee.employee_id,
+            employeeNo: result.employee.employee_no,
+            userId: result.user.user_id,
+            epfNo: request.epf_no,
+            reviewedBy: adminUserId,
+          },
+        });
+      } catch (notifyErr) {
+        console.error('[AdminService][acceptEmployeeRequest] Notification error:', notifyErr);
+      }
+    }
+
+    return {
+      message: 'Employee request accepted and employee account created successfully',
+      employeeId: result.employee.employee_id,
+      employeeNo: result.employee.employee_no,
+      userId: result.user.user_id,
+      epfNo: result.employee.epf_no,
+    };
+  }
+
+  async rejectEmployeeRequest(id: string, adminUserId: string, reason?: string) {
+    const request = await this.db.query.employeeAccountRequests.findFirst({
+      where: eq(schema.employeeAccountRequests.id, id),
+    });
+
+    if (!request) {
+      throw new NotFoundException('Employee account request not found');
+    }
+
+    if (request.status !== 'PENDING') {
+      throw new BadRequestException(`Request cannot be rejected because it is already ${request.status}`);
+    }
+
+    try {
+      await this.db
+        .update(schema.employeeAccountRequests)
+        .set({
+          status: 'REJECTED',
+          rejection_reason: reason || null,
+          reviewed_by: adminUserId || null,
+          reviewed_at: new Date(),
+          updated_at: new Date(),
+        })
+        .where(eq(schema.employeeAccountRequests.id, id));
+    } catch (err) {
+      console.error('[AdminService][rejectEmployeeRequest] DB error:', err);
+      throw new InternalServerErrorException('Failed to reject employee request');
+    }
+
+    // Notify HR requester
+    if (request.requested_by) {
+      try {
+        await this.notificationsService.create({
+          recipient_id: request.requested_by,
+          title: 'Employee Request Rejected',
+          message: `The employee account request for ${request.first_name} ${request.last_name} was rejected by Admin.${reason ? ` Reason: ${reason}` : ''}`,
+          type: 'REQUEST_REJECTED',
+          data: {
+            requestId: request.id,
+            reason: reason || null,
+            reviewedBy: adminUserId,
+          },
+        });
+      } catch (notifyErr) {
+        console.error('[AdminService][rejectEmployeeRequest] Notification error:', notifyErr);
+      }
+    }
+
+    return {
+      message: 'Employee account request rejected successfully',
+      requestId: id,
+      status: 'REJECTED',
+      reason: reason || null,
+    };
+  }
 }
+

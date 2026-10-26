@@ -5,6 +5,7 @@ import * as schema from '../database/schema';
 import { DATABASE_CONNECTION } from '../database/database.module';
 import { CreatePositionDto } from './dto/create-positions.dto';
 import { PositionQueryDto } from './dto/pagination-query.dto';
+import { generatePositionCode } from '../common/utils/code-generator.util';
 
 @Injectable()
 export class PositionsService {
@@ -14,9 +15,22 @@ export class PositionsService {
 
     async create(dto: CreatePositionDto) {
         try {
+            let positionCode = dto.positionCode?.trim();
+            if (positionCode) {
+                const existingCode = await this.db.query.positions.findFirst({
+                    where: eq(schema.positions.position_code, positionCode),
+                });
+                if (existingCode) {
+                    throw new InternalServerErrorException('Position code already exists');
+                }
+            } else {
+                positionCode = await generatePositionCode(this.db);
+            }
+
             const [newPosition] = await this.db
                 .insert(schema.positions)
                 .values({
+                    position_code: positionCode,
                     position_name: dto.positionName,
                     description: dto.description,
                     effective_date: dto.effectiveDate ? dto.effectiveDate : null,
@@ -46,6 +60,7 @@ export class PositionsService {
                 const searchPattern = `%${query.search.trim()}%`;
                 conditions.push(
                     or(
+                        ilike(schema.positions.position_code, searchPattern),
                         ilike(schema.positions.position_name, searchPattern),
                         ilike(schema.positions.description, searchPattern),
                         ilike(schema.positions.effective_date, searchPattern)

@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, boolean, timestamp, text, integer, date } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, boolean, timestamp, text, integer, date, jsonb } from 'drizzle-orm/pg-core';
 import { InferSelectModel } from 'drizzle-orm';
 import { pgEnum } from 'drizzle-orm/pg-core';
 import crypto from 'crypto';
@@ -65,6 +65,7 @@ export const passwordResetTokens = pgTable('password_reset_tokens', {
 // Departments Table (From Diagram)
 export const departments = pgTable('departments', {
   departmentId: uuid('department_id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  departmentCode: varchar('department_code', { length: 50 }).unique(),
   departmentName: varchar('department_name', { length: 100 }).notNull(),
   location: varchar('location', { length: 100 }),
   deptPhone: varchar('dept_phone', { length: 20 }),
@@ -75,6 +76,7 @@ export const departments = pgTable('departments', {
 // Positions Table (From Diagram)
 export const positions = pgTable('positions', {
   position_id: uuid('position_id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  position_code: varchar('position_code', { length: 50 }).unique(),
   position_name: varchar('position_name', { length: 100 }).notNull(),
   description: text('description'),
   effective_date: date('effective_date'),
@@ -84,6 +86,7 @@ export const positions = pgTable('positions', {
 // Employees Table (Core Master Entity)
 export const employees = pgTable('employees', {
   employee_id: uuid('employee_id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  employee_no: varchar('employee_no', { length: 50 }).unique(),
   user_id: uuid('user_id').references(() => users.user_id, { onDelete: 'set null' }),
   epf_no: varchar('epf_no', { length: 50 }).notNull().unique(),
   first_name: varchar('first_name', { length: 100 }).notNull(),
@@ -139,7 +142,64 @@ export const empDependents = pgTable('emp_dependents', {
   home_tp: varchar('home_tp', { length: 20 }),
 });
 
+// Employee Account Requests (Created by HR, reviewed by Admin)
+export const employeeAccountRequests = pgTable('employee_account_requests', {
+  id: uuid('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  requested_by: uuid('requested_by').references(() => users.user_id, { onDelete: 'set null' }),
+  status: varchar('status', { length: 20 }).default('PENDING').notNull(), // 'PENDING' | 'APPROVED' | 'REJECTED'
 
+  // Personal Identity
+  employee_no: varchar('employee_no', { length: 50 }),
+  first_name: varchar('first_name', { length: 100 }).notNull(),
+  last_name: varchar('last_name', { length: 100 }).notNull(),
+  dob: date('dob').notNull(),
+  join_date: date('join_date').notNull(),
+
+  // Work & Contact Details
+  epf_no: varchar('epf_no', { length: 50 }).notNull(),
+  work_email: varchar('work_email', { length: 255 }).notNull(),
+  personal_email: varchar('personal_email', { length: 255 }),
+  mobile_no: varchar('mobile_no', { length: 20 }),
+  home_tp: varchar('home_tp', { length: 20 }),
+
+  // Address
+  street: varchar('street', { length: 150 }),
+  city: varchar('city', { length: 100 }),
+  province: varchar('province', { length: 100 }),
+  country: varchar('country', { length: 100 }),
+
+  // Foreign Keys / Organization Relations
+  departmentId: uuid('department_id').references(() => departments.departmentId, { onDelete: 'set null' }),
+  position_id: uuid('position_id').references(() => positions.position_id, { onDelete: 'set null' }),
+  supervisor_id: uuid('supervisor_id').references(() => employees.employee_id, { onDelete: 'set null' }),
+  role: varchar('role', { length: 50 }).default('employee'),
+
+  // JSON arrays for relational collections
+  emergency_contacts: jsonb('emergency_contacts'),
+  qualifications: jsonb('qualifications'),
+  dependents: jsonb('dependents'),
+
+  // Decision & Audit
+  rejection_reason: text('rejection_reason'),
+  reviewed_by: uuid('reviewed_by').references(() => users.user_id, { onDelete: 'set null' }),
+  reviewed_at: timestamp('reviewed_at'),
+
+  created_at: timestamp('created_at').defaultNow(),
+  updated_at: timestamp('updated_at').defaultNow(),
+});
+
+// In-App Notifications
+export const notifications = pgTable('notifications', {
+  id: uuid('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  recipient_id: uuid('recipient_id').references(() => users.user_id, { onDelete: 'cascade' }),
+  recipient_role: varchar('recipient_role', { length: 50 }), // 'admin', 'hr', etc.
+  title: varchar('title', { length: 255 }).notNull(),
+  message: text('message').notNull(),
+  type: varchar('type', { length: 50 }).notNull(), // 'EMPLOYEE_ACCOUNT_REQUEST', 'REQUEST_APPROVED', 'REQUEST_REJECTED', etc.
+  data: jsonb('data'),
+  is_read: boolean('is_read').default(false).notNull(),
+  created_at: timestamp('created_at').defaultNow(),
+});
 
 export type User = InferSelectModel<typeof users>;
 export type Admin = User;
@@ -152,4 +212,6 @@ export type Employee = InferSelectModel<typeof employees>;
 export type EmpEmergencyContact = InferSelectModel<typeof empEmergencyContacts>;
 export type EmpQualification = InferSelectModel<typeof empQualifications>;
 export type EmpDependent = InferSelectModel<typeof empDependents>;
+export type EmployeeAccountRequest = InferSelectModel<typeof employeeAccountRequests>;
+export type Notification = InferSelectModel<typeof notifications>;
 

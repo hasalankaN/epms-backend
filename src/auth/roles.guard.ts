@@ -23,7 +23,8 @@ export class RolesGuard implements CanActivate {
             throw new ForbiddenException('Access denied: User role not found');
         }
 
-        const hasRole = requiredRoles.includes(user.role as UserRole);
+        const userRole = String(user.role).toLowerCase();
+        const hasRole = requiredRoles.some((r) => r.toLowerCase() === userRole);
 
         if (!hasRole) {
             throw new ForbiddenException('Access denied: You do not have permission for this action');

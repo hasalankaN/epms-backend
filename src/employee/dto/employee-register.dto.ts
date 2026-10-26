@@ -95,6 +95,11 @@ export class EmployeeRegisterDto {
     join_date: string;
 
     // --- Work & Contact Details ---
+    @ApiPropertyOptional({ example: 'EMP-0001', description: 'Readable employee number (auto-generated if omitted)' })
+    @IsString()
+    @IsOptional()
+    employee_no?: string;
+
     @ApiProperty({ example: 'EPF-10294' })
     @IsString()
     @IsNotEmpty()

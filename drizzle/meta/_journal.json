@@ -8,6 +8,20 @@
       "when": 1788631285197,
       "tag": "0000_init_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792998631816,
+      "tag": "0001_tiny_nemesis",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793000262891,
+      "tag": "0002_cultured_bastion",
+      "breakpoints": true
     }
   ]
 }

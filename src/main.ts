@@ -15,22 +15,11 @@ async function bootstrap() {
   //   credentials: true,
   // });
 
+  // Enable CORS
   app.enableCors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-
-      const isLocalhost = /^http:\/\/localhost:\d+$/.test(origin);
-
-      const isVercel = /\.vercel\.app$/.test(origin);
-
-      const isCustomFrontend = process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL;
-
-      if (isLocalhost || isVercel || isCustomFrontend) {
-        callback(null, true);
-      } else {
-        callback(new Error('CORS Policy මඟින් අවහිර කර ඇත'));
-      }
-    },
+    origin: true, 
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
     credentials: true,
   });
   // -------------------------------------------------------------

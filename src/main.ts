@@ -9,6 +9,28 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const appName = getAppName(app.get(ConfigService));
 
+  const allowedOrigins = [
+    'https://epms-web-rho.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:3000',
+  ];
+
+  app.enableCors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, Postman, or curl)
+      if (!origin) return callback(null, true);
+      
+      if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    credentials: true,
+  });
+
   // Enable CORS
   // app.enableCors({
   //   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
@@ -16,12 +38,12 @@ async function bootstrap() {
   // });
 
   // Enable CORS
-  app.enableCors({
-    origin: true, 
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
-    credentials: true,
-  });
+  // app.enableCors({
+  //   origin: true, 
+  //   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+  //   allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  //   credentials: true,
+  // });
   // -------------------------------------------------------------
 
   // Global validation pipe

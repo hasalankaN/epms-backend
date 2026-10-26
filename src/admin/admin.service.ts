@@ -6,6 +6,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { eq, sql, and } from 'drizzle-orm';
 import * as bcrypt from 'bcrypt';
 import * as schema from '../database/schema';
+import { getAppName } from '../common/app-name';
 import { DATABASE_CONNECTION } from '../database/database.module';
 import { EmailService } from '../email/email.service';
 import { AdminRegisterDto } from './dto/admin-register.dto';
@@ -137,20 +138,20 @@ export class AdminService {
     const content = `
       <div class="email-content">
         <p>Hi ${created.first_name},</p>
-        <p>Your admin account has been created for <strong>Fitness Coaching</strong>.</p>
+        <p>Your admin account has been created for <strong>${getAppName(this.configService)}</strong>.</p>
         <div class="info-box">
           <p><strong>Credentials</strong></p>
           <p>Email: <strong>${created.email}</strong></p>
           <p>Password: <strong>${dto.password}</strong></p>
         </div>
         <p>Please change your password after your first login.</p>
-        <p style="margin-top:20px;">Best regards,<br/><strong style="color: #7F435F;">The Fitness Coaching Team</strong></p>
+        <p style="margin-top:20px;">Best regards,<br/><strong style="color: #7F435F;">The ${getAppName(this.configService)} Team</strong></p>
       </div>
     `;
 
     await this.emailService.sendCustomEmail({
       to: created.email,
-      subject: 'Your Admin Account - Fitness Coaching',
+      subject: `Your Admin Account - ${getAppName(this.configService)}`,
       htmlContent: this.emailService['getEmailTemplate'] ? (this.emailService as any).getEmailTemplate(content) : content,
     });
 
@@ -234,14 +235,14 @@ export class AdminService {
           <p>Password: <strong>${dto.newPassword}</strong></p>
         </div>
         <p>If you did not request this change, please contact support immediately.</p>
-        <p style="margin-top:20px;">Best regards,<br/><strong style="color: #7F435F;">The Fitness Coaching Team</strong></p>
+        <p style="margin-top:20px;">Best regards,<br/><strong style="color: #7F435F;">The ${getAppName(this.configService)} Team</strong></p>
       </div>
     `;
 
     try {
       await this.emailService.sendCustomEmail({
         to: user.email,
-        subject: 'Your Admin Account Password Has Been Updated - Fitness Coaching',
+        subject: `Your Admin Account Password Has Been Updated - ${getAppName(this.configService)}`,
         htmlContent: this.emailService['getEmailTemplate'] ? (this.emailService as any).getEmailTemplate(content) : content,
       });
     } catch (err) {
@@ -290,14 +291,14 @@ export class AdminService {
           <p style="font-size: 20px; font-weight: 700;">${otp}</p>
         </div>
         <p>If you did not request this, please ignore this email.</p>
-        <p style="margin-top:20px;">Best regards,<br/><strong style="color: #7F435F;">The Fitness Coaching Team</strong></p>
+        <p style="margin-top:20px;">Best regards,<br/><strong style="color: #7F435F;">The ${getAppName(this.configService)} Team</strong></p>
       </div>
     `;
 
     try {
       await this.emailService.sendCustomEmail({
         to: user.email,
-        subject: 'Your Password Reset OTP - Fitness Coaching',
+        subject: `Your Password Reset OTP - ${getAppName(this.configService)}`,
         htmlContent: this.emailService['getEmailTemplate'] ? (this.emailService as any).getEmailTemplate(content) : content,
       });
     } catch (err) {
@@ -422,14 +423,14 @@ export class AdminService {
         <p>Hi ${user.first_name},</p>
         <p>Your admin account password has been reset successfully.</p>
         <p>If you did not request this change, please contact support immediately.</p>
-        <p style="margin-top:20px;">Best regards,<br/><strong style="color: #7F435F;">The Fitness Coaching Team</strong></p>
+        <p style="margin-top:20px;">Best regards,<br/><strong style="color: #7F435F;">The ${getAppName(this.configService)} Team</strong></p>
       </div>
     `;
 
     try {
       await this.emailService.sendCustomEmail({
         to: user.email,
-        subject: 'Your Password Has Been Reset - Fitness Coaching',
+        subject: `Your Password Has Been Reset - ${getAppName(this.configService)}`,
         htmlContent: this.emailService['getEmailTemplate'] ? (this.emailService as any).getEmailTemplate(content) : content,
       });
     } catch (err) {

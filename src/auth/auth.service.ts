@@ -132,15 +132,24 @@ export class AuthService {
         .returning();
 
       newUser = created;
-    } catch (error) {
+    } catch (error: unknown) {
+      const err = error as {
+        message?: string;
+        detail?: string;
+        code?: string;
+        hint?: string;
+        stack?: string;
+      };
+
       console.error('[AuthService] DB insert error:', {
-        message: error?.message,
-        detail: error?.detail,
-        code: error?.code,
-        hint: error?.hint,
-        stack: error?.stack,
+        message: err.message,
+        detail: err.detail,
+        code: err.code,
+        hint: err.hint,
+        stack: err.stack,
       });
-      throw new InternalServerErrorException('Database insert failed: ' + (error?.detail || error?.message || 'unknown'));
+
+      throw new InternalServerErrorException('Database insert failed: ' + (err.detail || err.message || 'unknown'));
     }
 
     // Send OTP email
@@ -575,7 +584,7 @@ export class AuthService {
         });
       } catch (error) {
         // If Firebase user doesn't exist, create one
-        if (error.message.includes('user-not-found')) {
+        if (error instanceof Error && error.message.includes('user-not-found')) {
           await this.firebaseService.createUser({
             uid: user.firebase_uid,
             email: dto.email,

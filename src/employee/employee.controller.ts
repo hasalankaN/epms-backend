@@ -2,6 +2,7 @@ import { Controller, Post, Body, Param, Get, Query, UseGuards } from '@nestjs/co
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { EmployeeRegisterDto } from './dto/employee-register.dto';
 import { EmployeeQueryDto } from './dto/employee-query.dto';
+import { SupervisorQueryDto } from './dto/supervisor-query.dto';
 import { EmployeeService } from './employee.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -30,6 +31,20 @@ export class EmployeeController {
     @ApiResponse({ status: 200, description: 'List of employees retrieved successfully' })
     async findAll(@Query() query: EmployeeQueryDto) {
         return this.employeeService.findAll(query);
+    }
+
+    @Get('supervisors')
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    @ApiOperation({
+        summary: 'Get list of supervisors (employees who supervise others)',
+        description:
+            'Returns all employees that are assigned as a supervisor to at least one other employee. ' +
+            'Supports pagination and optional search by supervisor name or position name.',
+    })
+    @ApiResponse({ status: 200, description: 'Paginated supervisor list with position and department details' })
+    async getSupervisors(@Query() query: SupervisorQueryDto) {
+        return this.employeeService.getSupervisors(query);
     }
 
     @Get(':id')

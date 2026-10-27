@@ -8,6 +8,7 @@ import { DATABASE_CONNECTION } from '../database/database.module';
 import { EmailService } from '../email/email.service';
 import { EmployeeRegisterDto } from './dto/employee-register.dto';
 import { EmployeeQueryDto } from './dto/employee-query.dto';
+import { SupervisorQueryDto } from './dto/supervisor-query.dto';
 import { UserRole } from '../common/enums/roles.enum';
 import { generateEmployeeNo } from '../common/utils/code-generator.util';
 import * as crypto from 'crypto';
@@ -453,6 +454,107 @@ export class EmployeeService {
             if (err instanceof NotFoundException) throw err;
             console.error('[EmployeeService][findOne] DB error:', err);
             throw new InternalServerErrorException('Database error while retrieving employee details');
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    //  GET /employee/supervisors
+    //  Returns employees who supervise at least one other employee,
+    //  joined with their position & department, supporting pagination
+    //  and optional search by name or position name.
+    // ─────────────────────────────────────────────────────────────────
+    async getSupervisors(query: SupervisorQueryDto) {
+        try {
+            const page = query.page ?? 1;
+            const pageSize = query.pageSize ?? 10;
+            const offset = (page - 1) * pageSize;
+            const search = query.search?.trim();
+
+            // Build WHERE conditions
+            const conditions: SQL[] = [];
+
+            // Only employees that are referenced as supervisor_id by at least one other row
+            conditions.push(
+                sql`${schema.employees.employee_id} IN (
+                    SELECT DISTINCT supervisor_id
+                    FROM employees
+                    WHERE supervisor_id IS NOT NULL
+                )`,
+            );
+
+            if (search) {
+                conditions.push(
+                    or(
+                        ilike(schema.employees.first_name, `%${search}%`),
+                        ilike(schema.employees.last_name, `%${search}%`),
+                        ilike(
+                            sql`${schema.employees.first_name} || ' ' || ${schema.employees.last_name}`,
+                            `%${search}%`,
+                        ),
+                        ilike(schema.positions.position_name, `%${search}%`),
+                    ) as SQL,
+                );
+            }
+
+            const whereClause = and(...conditions);
+
+            // Count total
+            const [{ total }] = await this.db
+                .select({ total: count() })
+                .from(schema.employees)
+                .leftJoin(schema.positions, eq(schema.employees.position_id, schema.positions.position_id))
+                .where(whereClause);
+
+            // Fetch page
+            const rows = await this.db
+                .select({
+                    supervisor_id: schema.employees.employee_id,
+                    employee_no: schema.employees.employee_no,
+                    first_name: schema.employees.first_name,
+                    last_name: schema.employees.last_name,
+                    work_email: schema.employees.work_email,
+                    mobile_no: schema.employees.mobile_no,
+                    position: {
+                        position_id: schema.positions.position_id,
+                        position_code: schema.positions.position_code,
+                        position_name: schema.positions.position_name,
+                    },
+                    department: {
+                        department_id: schema.departments.departmentId,
+                        department_code: schema.departments.departmentCode,
+                        department_name: schema.departments.departmentName,
+                    },
+                })
+                .from(schema.employees)
+                .leftJoin(schema.positions, eq(schema.employees.position_id, schema.positions.position_id))
+                .leftJoin(schema.departments, eq(schema.employees.departmentId, schema.departments.departmentId))
+                .where(whereClause)
+                .orderBy(schema.employees.first_name)
+                .limit(pageSize)
+                .offset(offset);
+
+            return {
+                data: rows.map((r) => ({
+                    supervisor_id: r.supervisor_id,
+                    employee_no: r.employee_no,
+                    name: `${r.first_name} ${r.last_name}`,
+                    first_name: r.first_name,
+                    last_name: r.last_name,
+                    work_email: r.work_email,
+                    mobile_no: r.mobile_no,
+                    position: r.position?.position_id ? r.position : null,
+                    department: r.department?.department_id ? r.department : null,
+                })),
+                meta: {
+                    total: Number(total),
+                    page,
+                    pageSize,
+                    totalPages: Math.ceil(Number(total) / pageSize),
+                },
+            };
+        } catch (err) {
+            console.error('[EmployeeService][getSupervisors] DB error:', err);
+            throw new InternalServerErrorException('Database error while retrieving supervisors');
         }
     }
 }

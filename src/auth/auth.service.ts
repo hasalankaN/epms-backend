@@ -9,7 +9,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, gt, sql } from 'drizzle-orm';
+import { eq, and, gt, sql, or, isNull } from 'drizzle-orm';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { FirebaseService } from '../firebase/firebase.service';
@@ -473,6 +473,9 @@ export class AuthService {
       email: dto.email,
       otp_hash: otpHash,
       expires_at: expiresAt,
+      is_used: false,
+      attempts: 0,
+      created_at: new Date(),
     });
 
     // Send OTP email
@@ -494,7 +497,10 @@ export class AuthService {
       .where(
         and(
           eq(schema.passwordResetOtps.email, dto.email),
-          eq(schema.passwordResetOtps.is_used, false),
+          or(
+            eq(schema.passwordResetOtps.is_used, false),
+            isNull(schema.passwordResetOtps.is_used),
+          ),
         ),
       )
       .orderBy(schema.passwordResetOtps.created_at);
@@ -538,6 +544,8 @@ export class AuthService {
       token: resetToken,
       associated_otp_id: otpRecord.id,
       expires_at: tokenExpiresAt,
+      is_used: false,
+      created_at: new Date(),
     });
 
     return {
@@ -558,7 +566,10 @@ export class AuthService {
       where: and(
         eq(schema.passwordResetTokens.email, dto.email),
         eq(schema.passwordResetTokens.token, dto.resetToken),
-        eq(schema.passwordResetTokens.is_used, false),
+        or(
+          eq(schema.passwordResetTokens.is_used, false),
+          isNull(schema.passwordResetTokens.is_used),
+        ),
       ),
     });
 

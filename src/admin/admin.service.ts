@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, sql, and, or, count, desc, ilike, SQL } from 'drizzle-orm';
+import { eq, sql, and, or, count, desc, ilike, SQL, isNull } from 'drizzle-orm';
 import * as bcrypt from 'bcrypt';
 import * as schema from '../database/schema';
 import { getAppName } from '../common/app-name';
@@ -280,6 +280,9 @@ export class AdminService {
         email: user.email,
         otp_hash: otpHash,
         expires_at: expiresAt,
+        is_used: false,
+        attempts: 0,
+        created_at: new Date(),
       });
     } catch (err) {
       console.error('[AdminService][sendPasswordOtp] DB update error:', err);
@@ -324,7 +327,10 @@ export class AdminService {
       .where(
         and(
           eq(schema.passwordResetOtps.email, email),
-          eq(schema.passwordResetOtps.is_used, false),
+          or(
+            eq(schema.passwordResetOtps.is_used, false),
+            isNull(schema.passwordResetOtps.is_used),
+          ),
         ),
       )
       .orderBy(schema.passwordResetOtps.created_at);
@@ -363,6 +369,8 @@ export class AdminService {
         token: resetToken,
         associated_otp_id: otpRecord.id,
         expires_at: tokenExpiresAt,
+        is_used: false,
+        created_at: new Date(),
       });
     } catch (err) {
       console.error('[AdminService][confirmPasswordOtp] DB error:', err);
@@ -377,7 +385,10 @@ export class AdminService {
       where: and(
         eq(schema.passwordResetTokens.email, email),
         eq(schema.passwordResetTokens.token, resetToken),
-        eq(schema.passwordResetTokens.is_used, false),
+        or(
+          eq(schema.passwordResetTokens.is_used, false),
+          isNull(schema.passwordResetTokens.is_used),
+        ),
       ),
     });
 

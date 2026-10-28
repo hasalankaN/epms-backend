@@ -44,9 +44,9 @@ export const passwordResetOtps = pgTable('password_reset_otps', {
   email: varchar('email', { length: 255 }).notNull(),
   otp_hash: varchar('otp_hash', { length: 255 }).notNull(),
   expires_at: timestamp('expires_at').notNull(),
-  is_used: boolean('is_used'),
-  attempts: integer('attempts'),
-  created_at: timestamp('created_at'),
+  is_used: boolean('is_used').default(false),
+  attempts: integer('attempts').default(0),
+  created_at: timestamp('created_at').defaultNow(),
 });
 
 export const passwordResetTokens = pgTable('password_reset_tokens', {
@@ -55,10 +55,10 @@ export const passwordResetTokens = pgTable('password_reset_tokens', {
   token: varchar('token', { length: 255 }).notNull(),
   associated_otp_id: uuid('associated_otp_id'),
   expires_at: timestamp('expires_at').notNull(),
-  is_used: boolean('is_used'),
+  is_used: boolean('is_used').default(false),
   created_ip: varchar('created_ip', { length: 45 }),
   user_agent: text('user_agent'),
-  created_at: timestamp('created_at'),
+  created_at: timestamp('created_at').defaultNow(),
 });
 
 

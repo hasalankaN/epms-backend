@@ -10,10 +10,43 @@ import {
   UseGuards,
   Req,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery, ApiBody } from '@nestjs/swagger';
 import { HrService } from './hr.service';
 import { CreateEmployeeRequestDto } from './dto/create-employee-request.dto';
 import { EmployeeRequestQueryDto } from './dto/employee-request-query.dto';
+import { CreateEmployeeDto } from './dto/create-employee.dto';
+import { UpdateEmployeeDto } from './dto/update-employee.dto';
+import { UpdateHrProfileDto } from './dto/update-hr-profile.dto';
+import { AssignSupervisorDto } from './dto/assign-supervisor.dto';
+import { UpdateEmployeeRoleDto } from './dto/update-employee-role.dto';
+import { DecideRequestDto } from './dto/decide-request.dto';
+import { CreateTrainingDto } from './dto/create-training.dto';
+import { UpdateTrainingDto } from './dto/update-training.dto';
+import { TrainingEvaluationDto } from './dto/training-evaluation.dto';
+import { UpdateTrainingBudgetDto } from './dto/update-training-budget.dto';
+import { CreateTrainingMaterialDto, UpdateTrainingMaterialDto } from './dto/training-material.dto';import { DecideLeaveDto } from './dto/decide-leave.dto';
+import { GrantSpecialLeaveDto } from './dto/grant-special-leave.dto';
+import { UpdateLeaveBalanceDto } from './dto/update-leave-balance.dto';
+import { UpdateLeavePolicyDto } from './dto/update-leave-policy.dto';
+import { CreatePerformanceReviewDto } from './dto/create-performance-review.dto';
+import { AddReviewFeedbackDto } from './dto/add-review-feedback.dto';
+import { CreateCompensationDto } from './dto/create-compensation.dto';
+import { CreateVacancyDto } from './dto/create-vacancy.dto';
+import { UpdateVacancyDto } from './dto/update-vacancy.dto';
+import { CreateCandidateDto } from './dto/create-candidate.dto';
+import { CreateInterviewDto } from './dto/create-interview.dto';
+import { UpdateInterviewDto } from './dto/update-interview.dto';
+import { AssignPositionDto } from './dto/assign-position.dto';
+import { TransferPositionDto } from './dto/transfer-position.dto';
+import { UpdateSalaryDto } from './dto/update-salary.dto';
+import { AddDeductionDto } from './dto/add-deduction.dto';
+import { AddAllowanceDto } from './dto/add-allowance.dto';
+import { CreateBonusDto } from './dto/create-bonus.dto';
+import { CreateSalarySlipDto } from './dto/create-salary-slip.dto';
+import { NotifyAttendanceDto } from './dto/notify-attendance.dto';
+import { CreateNotificationDto } from './dto/create-notification.dto';
+import { UpdateNotificationDto } from './dto/update-notification.dto';
+import { CreateAccountRequestDto } from './dto/account-request.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -25,13 +58,14 @@ import { UserRole } from '../common/enums/roles.enum';
 @Roles(UserRole.HR, UserRole.ADMIN)
 @Controller('hr')
 export class HrController {
-  constructor(private readonly hrService: HrService) {}
+  constructor(private readonly hrService: HrService) { }
 
   // -------------------------------------------------------------
   // Existing Employee Account Requests
   // -------------------------------------------------------------
   @Post('employee-request')
   @ApiOperation({ summary: 'Submit a new employee account request to Admin for approval (HR)' })
+  @ApiBody({ type: CreateEmployeeRequestDto })
   async createEmployeeRequest(@Body() dto: CreateEmployeeRequestDto, @Req() req: any) {
     const requestedBy = req.user?.sub || req.user?.userId;
     return this.hrService.createEmployeeRequest(dto, requestedBy);
@@ -62,9 +96,10 @@ export class HrController {
 
   @Patch('profile')
   @ApiOperation({ summary: 'Update HR own profile' })
-  async updateProfile(@Req() req: any, @Body() body: any) {
+  @ApiBody({ type: UpdateHrProfileDto })
+  async updateProfile(@Req() req: any, @Body() dto: UpdateHrProfileDto) {
     const userId = req.user?.sub || req.user?.userId;
-    return this.hrService.updateProfile(userId, body);
+    return this.hrService.updateProfile(userId, dto);
   }
 
   // -------------------------------------------------------------
@@ -85,14 +120,16 @@ export class HrController {
 
   @Post('employees')
   @ApiOperation({ summary: 'Create new employee directly' })
-  async createEmployee(@Body() dto: any) {
+  @ApiBody({ type: CreateEmployeeDto })
+  async createEmployee(@Body() dto: CreateEmployeeDto) {
     return this.hrService.createEmployee(dto);
   }
 
   @Patch('employees/:id')
   @ApiOperation({ summary: 'Update employee details' })
   @ApiParam({ name: 'id', description: 'Employee ID' })
-  async updateEmployee(@Param('id') id: string, @Body() dto: any) {
+  @ApiBody({ type: UpdateEmployeeDto })
+  async updateEmployee(@Param('id') id: string, @Body() dto: UpdateEmployeeDto) {
     return this.hrService.updateEmployee(id, dto);
   }
 
@@ -106,7 +143,8 @@ export class HrController {
   @Patch('employees/:id/supervisor')
   @ApiOperation({ summary: 'Assign supervisor to employee' })
   @ApiParam({ name: 'id', description: 'Employee ID' })
-  async updateEmployeeSupervisor(@Param('id') id: string, @Body() body: { supervisor_id: string }) {
+  @ApiBody({ type: AssignSupervisorDto })
+  async updateEmployeeSupervisor(@Param('id') id: string, @Body() body: AssignSupervisorDto) {
     return this.hrService.updateEmployeeSupervisor(id, body.supervisor_id);
   }
 
@@ -120,7 +158,8 @@ export class HrController {
   @Patch('employees/:id/roles')
   @ApiOperation({ summary: 'Update employee role' })
   @ApiParam({ name: 'id', description: 'Employee ID' })
-  async updateEmployeeRoles(@Param('id') id: string, @Body() body: { role: string }) {
+  @ApiBody({ type: UpdateEmployeeRoleDto })
+  async updateEmployeeRoles(@Param('id') id: string, @Body() body: UpdateEmployeeRoleDto) {
     return this.hrService.updateEmployeeRoles(id, body);
   }
 
@@ -136,10 +175,11 @@ export class HrController {
   @Patch('requests/profile-updates/:id')
   @ApiOperation({ summary: 'Approve / reject profile update request with comment' })
   @ApiParam({ name: 'id', description: 'Request ID' })
+  @ApiBody({ type: DecideRequestDto })
   async decideProfileUpdateRequest(
     @Req() req: any,
     @Param('id') id: string,
-    @Body() dto: { decision: 'APPROVED' | 'REJECTED'; comment?: string },
+    @Body() dto: DecideRequestDto,
   ) {
     const userId = req.user?.sub || req.user?.userId;
     return this.hrService.decideProfileUpdateRequest(id, userId, dto);
@@ -165,7 +205,8 @@ export class HrController {
 
   @Post('attendance/notify')
   @ApiOperation({ summary: 'Send attendance notification / warning to employee' })
-  async notifyAttendance(@Body() dto: { empId: string; message: string; title?: string }) {
+  @ApiBody({ type: NotifyAttendanceDto })
+  async notifyAttendance(@Body() dto: NotifyAttendanceDto) {
     return this.hrService.notifyAttendance(dto);
   }
 
@@ -181,7 +222,8 @@ export class HrController {
   // -------------------------------------------------------------
   @Post('trainings')
   @ApiOperation({ summary: 'Create new training' })
-  async createTraining(@Req() req: any, @Body() dto: any) {
+  @ApiBody({ type: CreateTrainingDto })
+  async createTraining(@Req() req: any, @Body() dto: CreateTrainingDto) {
     const userId = req.user?.sub || req.user?.userId;
     return this.hrService.createTraining(userId, dto);
   }
@@ -202,7 +244,8 @@ export class HrController {
   @Patch('trainings/:id')
   @ApiOperation({ summary: 'Update training details' })
   @ApiParam({ name: 'id', description: 'Training ID' })
-  async updateTraining(@Param('id') id: string, @Body() dto: any) {
+  @ApiBody({ type: UpdateTrainingDto })
+  async updateTraining(@Param('id') id: string, @Body() dto: UpdateTrainingDto) {
     return this.hrService.updateTraining(id, dto);
   }
 
@@ -216,9 +259,10 @@ export class HrController {
   @Post('trainings/:id/evaluation')
   @ApiOperation({ summary: 'Submit training evaluation for participant' })
   @ApiParam({ name: 'id', description: 'Training ID' })
+  @ApiBody({ type: TrainingEvaluationDto })
   async submitHrTrainingEvaluation(
     @Param('id') id: string,
-    @Body() dto: { emp_id: string; rating: number; evaluation: string },
+    @Body() dto: TrainingEvaluationDto,
   ) {
     return this.hrService.submitHrTrainingEvaluation(id, dto);
   }
@@ -233,9 +277,10 @@ export class HrController {
   @Patch('trainings/:id/budget')
   @ApiOperation({ summary: 'Update training budget and approval status' })
   @ApiParam({ name: 'id', description: 'Training ID' })
+  @ApiBody({ type: UpdateTrainingBudgetDto })
   async updateTrainingBudget(
     @Param('id') id: string,
-    @Body() dto: { budget: number; budget_status: string },
+    @Body() dto: UpdateTrainingBudgetDto,
   ) {
     return this.hrService.updateTrainingBudget(id, dto);
   }
@@ -243,7 +288,8 @@ export class HrController {
   @Post('trainings/:id/materials')
   @ApiOperation({ summary: 'Upload training material' })
   @ApiParam({ name: 'id', description: 'Training ID' })
-  async createTrainingMaterial(@Param('id') id: string, @Body() dto: { title: string; file_path: string }) {
+  @ApiBody({ type: CreateTrainingMaterialDto })
+  async createTrainingMaterial(@Param('id') id: string, @Body() dto: CreateTrainingMaterialDto) {
     return this.hrService.createTrainingMaterial(id, dto);
   }
 
@@ -251,10 +297,11 @@ export class HrController {
   @ApiOperation({ summary: 'Update training material' })
   @ApiParam({ name: 'id', description: 'Training ID' })
   @ApiParam({ name: 'materialId', description: 'Material ID' })
+  @ApiBody({ type: UpdateTrainingMaterialDto })
   async updateTrainingMaterial(
     @Param('id') id: string,
     @Param('materialId') materialId: string,
-    @Body() dto: any,
+    @Body() dto: UpdateTrainingMaterialDto,
   ) {
     return this.hrService.updateTrainingMaterial(id, materialId, dto);
   }
@@ -280,10 +327,11 @@ export class HrController {
   @Patch('leaves/:id/decision')
   @ApiOperation({ summary: 'HR approve or reject leave request' })
   @ApiParam({ name: 'id', description: 'Leave ID' })
+  @ApiBody({ type: DecideLeaveDto })
   async decideLeave(
     @Req() req: any,
     @Param('id') id: string,
-    @Body() dto: { decision: 'APPROVED' | 'REJECTED'; comment?: string },
+    @Body() dto: DecideLeaveDto,
   ) {
     const userId = req.user?.sub || req.user?.userId;
     return this.hrService.decideLeave(id, userId, dto);
@@ -298,8 +346,9 @@ export class HrController {
 
   @Post('leaves/special')
   @ApiOperation({ summary: 'Grant special leave to employee' })
+  @ApiBody({ type: GrantSpecialLeaveDto })
   async createSpecialLeave(
-    @Body() dto: { emp_id: string; days: number; reason: string; start_date: string; end_date: string },
+    @Body() dto: GrantSpecialLeaveDto,
   ) {
     return this.hrService.createSpecialLeave(dto);
   }
@@ -307,9 +356,10 @@ export class HrController {
   @Patch('leave-balances/:empId')
   @ApiOperation({ summary: 'Update leave balance for employee' })
   @ApiParam({ name: 'empId', description: 'Employee ID' })
+  @ApiBody({ type: UpdateLeaveBalanceDto })
   async updateLeaveBalance(
     @Param('empId') empId: string,
-    @Body() dto: { leave_type: string; year: number; balance: number },
+    @Body() dto: UpdateLeaveBalanceDto,
   ) {
     return this.hrService.updateLeaveBalance(empId, dto);
   }
@@ -330,7 +380,8 @@ export class HrController {
   @Patch('leave-policies/:leaveType')
   @ApiOperation({ summary: 'Update leave policy' })
   @ApiParam({ name: 'leaveType', description: 'Leave type' })
-  async updateLeavePolicy(@Req() req: any, @Param('leaveType') leaveType: string, @Body() dto: any) {
+  @ApiBody({ type: UpdateLeavePolicyDto })
+  async updateLeavePolicy(@Req() req: any, @Param('leaveType') leaveType: string, @Body() dto: UpdateLeavePolicyDto) {
     const userId = req.user?.sub || req.user?.userId;
     return this.hrService.updateLeavePolicy(leaveType, dto, userId);
   }
@@ -358,7 +409,8 @@ export class HrController {
 
   @Post('performance-reviews')
   @ApiOperation({ summary: 'Create performance review' })
-  async createPerformanceReview(@Req() req: any, @Body() dto: any) {
+  @ApiBody({ type: CreatePerformanceReviewDto })
+  async createPerformanceReview(@Req() req: any, @Body() dto: CreatePerformanceReviewDto) {
     const userId = req.user?.sub || req.user?.userId;
     return this.hrService.createPerformanceReview(userId, dto);
   }
@@ -366,13 +418,15 @@ export class HrController {
   @Post('performance-reviews/:id/feedback')
   @ApiOperation({ summary: 'Add feedback or reward to performance review' })
   @ApiParam({ name: 'id', description: 'Review ID' })
-  async addReviewFeedback(@Param('id') id: string, @Body() dto: { feedback: string; reward?: string }) {
+  @ApiBody({ type: AddReviewFeedbackDto })
+  async addReviewFeedback(@Param('id') id: string, @Body() dto: AddReviewFeedbackDto) {
     return this.hrService.addReviewFeedback(id, dto);
   }
 
   @Post('compensation')
   @ApiOperation({ summary: 'Record compensation or bonus' })
-  async createCompensation(@Body() dto: { emp_id: string; amount: number; description: string; month: string }) {
+  @ApiBody({ type: CreateCompensationDto })
+  async createCompensation(@Body() dto: CreateCompensationDto) {
     return this.hrService.createCompensation(dto);
   }
 
@@ -388,6 +442,18 @@ export class HrController {
   // -------------------------------------------------------------
   @Post('departments')
   @ApiOperation({ summary: 'Create department' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['department_code', 'department_name'],
+      properties: {
+        department_code: { type: 'string', example: 'ENG' },
+        department_name: { type: 'string', example: 'Engineering' },
+        location: { type: 'string', example: 'Building A, 3rd Floor' },
+        dept_phone: { type: 'string', example: '+94112345678' },
+      },
+    },
+  })
   async createDepartment(@Body() dto: any) {
     return this.hrService.createDepartment(dto);
   }
@@ -401,6 +467,18 @@ export class HrController {
 
   @Post('positions')
   @ApiOperation({ summary: 'Create position' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['position_code', 'position_name'],
+      properties: {
+        position_code: { type: 'string', example: 'SE' },
+        position_name: { type: 'string', example: 'Software Engineer' },
+        description: { type: 'string', example: 'Responsible for software development' },
+        effective_date: { type: 'string', example: '2026-01-01' },
+      },
+    },
+  })
   async createPosition(@Body() dto: any) {
     return this.hrService.createPosition(dto);
   }
@@ -408,6 +486,16 @@ export class HrController {
   @Patch('positions/:id')
   @ApiOperation({ summary: 'Update position' })
   @ApiParam({ name: 'id', description: 'Position ID' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        position_name: { type: 'string', example: 'Senior Software Engineer' },
+        description: { type: 'string', example: 'Updated position description' },
+        effective_date: { type: 'string', example: '2026-06-01' },
+      },
+    },
+  })
   async updatePosition(@Param('id') id: string, @Body() dto: any) {
     return this.hrService.updatePosition(id, dto);
   }
@@ -422,10 +510,11 @@ export class HrController {
   @Post('positions/:id/assign')
   @ApiOperation({ summary: 'Assign position to employee' })
   @ApiParam({ name: 'id', description: 'Position ID' })
+  @ApiBody({ type: AssignPositionDto })
   async assignPosition(
     @Req() req: any,
     @Param('id') positionId: string,
-    @Body() dto: { emp_id: string; dept_id?: string; start_date?: string; reason?: string },
+    @Body() dto: AssignPositionDto,
   ) {
     const userId = req.user?.sub || req.user?.userId;
     return this.hrService.assignPosition(positionId, userId, dto);
@@ -433,9 +522,10 @@ export class HrController {
 
   @Post('positions/transfer')
   @ApiOperation({ summary: 'Transfer employee position' })
+  @ApiBody({ type: TransferPositionDto })
   async transferPosition(
     @Req() req: any,
-    @Body() dto: { emp_id: string; new_position_id: string; new_dept_id?: string; start_date?: string; reason?: string },
+    @Body() dto: TransferPositionDto,
   ) {
     const userId = req.user?.sub || req.user?.userId;
     return this.hrService.transferPosition(userId, dto);
@@ -461,10 +551,11 @@ export class HrController {
   @Patch('salaries/:empId')
   @ApiOperation({ summary: 'Update salary (append-only with effectiveDate)' })
   @ApiParam({ name: 'empId', description: 'Employee ID' })
+  @ApiBody({ type: UpdateSalaryDto })
   async updateSalary(
     @Req() req: any,
     @Param('empId') empId: string,
-    @Body() dto: { basic_salary: number; effective_date: string; reason?: string },
+    @Body() dto: UpdateSalaryDto,
   ) {
     const userId = req.user?.sub || req.user?.userId;
     return this.hrService.updateSalary(empId, userId, dto);
@@ -473,7 +564,8 @@ export class HrController {
   @Post('salaries/:empId/deductions')
   @ApiOperation({ summary: 'Add deduction to employee salary' })
   @ApiParam({ name: 'empId', description: 'Employee ID' })
-  async addDeduction(@Param('empId') empId: string, @Body() dto: { description: string; amount: number }) {
+  @ApiBody({ type: AddDeductionDto })
+  async addDeduction(@Param('empId') empId: string, @Body() dto: AddDeductionDto) {
     return this.hrService.addDeduction(empId, dto);
   }
 
@@ -488,7 +580,8 @@ export class HrController {
   @Post('salaries/:empId/allowances')
   @ApiOperation({ summary: 'Add allowance to employee salary' })
   @ApiParam({ name: 'empId', description: 'Employee ID' })
-  async addAllowance(@Param('empId') empId: string, @Body() dto: { description: string; amount: number }) {
+  @ApiBody({ type: AddAllowanceDto })
+  async addAllowance(@Param('empId') empId: string, @Body() dto: AddAllowanceDto) {
     return this.hrService.addAllowance(empId, dto);
   }
 
@@ -502,9 +595,10 @@ export class HrController {
 
   @Post('bonuses')
   @ApiOperation({ summary: 'Add bonus to employee' })
+  @ApiBody({ type: CreateBonusDto })
   async createBonus(
     @Req() req: any,
-    @Body() dto: { emp_id: string; description: string; amount: number; month: string },
+    @Body() dto: CreateBonusDto,
   ) {
     const userId = req.user?.sub || req.user?.userId;
     return this.hrService.createBonus(userId, dto);
@@ -519,16 +613,10 @@ export class HrController {
 
   @Post('salary-slips')
   @ApiOperation({ summary: 'Generate salary slip (calculates net salary)' })
+  @ApiBody({ type: CreateSalarySlipDto })
   async createSalarySlip(
     @Req() req: any,
-    @Body()
-    dto: {
-      emp_id: string;
-      month: string;
-      basic_salary?: number;
-      overtime_amount?: number;
-      bonus_amount?: number;
-    },
+    @Body() dto: CreateSalarySlipDto,
   ) {
     const userId = req.user?.sub || req.user?.userId;
     return this.hrService.createSalarySlip(userId, dto);
@@ -553,7 +641,8 @@ export class HrController {
   // -------------------------------------------------------------
   @Post('vacancies')
   @ApiOperation({ summary: 'Create vacancy' })
-  async createVacancy(@Req() req: any, @Body() dto: any) {
+  @ApiBody({ type: CreateVacancyDto })
+  async createVacancy(@Req() req: any, @Body() dto: CreateVacancyDto) {
     const userId = req.user?.sub || req.user?.userId;
     return this.hrService.createVacancy(userId, dto);
   }
@@ -561,7 +650,8 @@ export class HrController {
   @Patch('vacancies/:id')
   @ApiOperation({ summary: 'Update vacancy' })
   @ApiParam({ name: 'id', description: 'Vacancy ID' })
-  async updateVacancy(@Param('id') id: string, @Body() dto: any) {
+  @ApiBody({ type: UpdateVacancyDto })
+  async updateVacancy(@Param('id') id: string, @Body() dto: UpdateVacancyDto) {
     return this.hrService.updateVacancy(id, dto);
   }
 
@@ -581,7 +671,8 @@ export class HrController {
 
   @Post('candidates')
   @ApiOperation({ summary: 'Add external candidate' })
-  async createCandidate(@Body() dto: { full_name: string; email: string; phone?: string; resume_url?: string }) {
+  @ApiBody({ type: CreateCandidateDto })
+  async createCandidate(@Body() dto: CreateCandidateDto) {
     return this.hrService.createCandidate(dto);
   }
 
@@ -594,16 +685,10 @@ export class HrController {
 
   @Post('interviews')
   @ApiOperation({ summary: 'Schedule interview (validates no conflicts)' })
+  @ApiBody({ type: CreateInterviewDto })
   async createInterview(
     @Req() req: any,
-    @Body()
-    dto: {
-      application_id?: string;
-      candidate_id?: string;
-      interview_by?: string;
-      interview_date: string;
-      notes?: string;
-    },
+    @Body() dto: CreateInterviewDto,
   ) {
     const userId = req.user?.sub || req.user?.userId;
     return this.hrService.createInterview(userId, dto);
@@ -612,7 +697,8 @@ export class HrController {
   @Patch('interviews/:id')
   @ApiOperation({ summary: 'Update interview' })
   @ApiParam({ name: 'id', description: 'Interview ID' })
-  async updateInterview(@Param('id') id: string, @Body() dto: any) {
+  @ApiBody({ type: UpdateInterviewDto })
+  async updateInterview(@Param('id') id: string, @Body() dto: UpdateInterviewDto) {
     return this.hrService.updateInterview(id, dto);
   }
 
@@ -621,7 +707,8 @@ export class HrController {
   // -------------------------------------------------------------
   @Post('notifications')
   @ApiOperation({ summary: 'Create HR notification' })
-  async createNotification(@Body() dto: any) {
+  @ApiBody({ type: CreateNotificationDto })
+  async createNotification(@Body() dto: CreateNotificationDto) {
     return this.hrService.createNotification(dto);
   }
 
@@ -634,7 +721,8 @@ export class HrController {
   @Patch('notifications/:id')
   @ApiOperation({ summary: 'Update notification' })
   @ApiParam({ name: 'id', description: 'Notification ID' })
-  async updateNotification(@Param('id') id: string, @Body() dto: any) {
+  @ApiBody({ type: UpdateNotificationDto })
+  async updateNotification(@Param('id') id: string, @Body() dto: UpdateNotificationDto) {
     return this.hrService.updateNotification(id, dto);
   }
 
@@ -708,15 +796,10 @@ export class HrController {
   // -------------------------------------------------------------
   @Post('requests/account')
   @ApiOperation({ summary: 'Send account request (create, deactivate, role change) to Admin' })
+  @ApiBody({ type: CreateAccountRequestDto })
   async createAccountRequest(
     @Req() req: any,
-    @Body()
-    dto: {
-      request_type: 'ACCOUNT_CREATE' | 'ACCOUNT_DEACTIVATE' | 'ROLE_CHANGE';
-      target_emp_id?: string;
-      request_data: any;
-      reason: string;
-    },
+    @Body() dto: CreateAccountRequestDto,
   ) {
     const userId = req.user?.sub || req.user?.userId;
     return this.hrService.createAccountRequest(userId, dto);

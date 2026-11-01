@@ -130,4 +130,223 @@ export class AdminController {
     const adminUserId = req.user?.sub || req.user?.userId;
     return this.adminService.rejectEmployeeRequest(id, adminUserId, dto.reason);
   }
+
+  // -------------------------------------------------------------
+  // Profile
+  // -------------------------------------------------------------
+  @Get('profile')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get admin own profile' })
+  async getProfile(@Req() req: any) {
+    const userId = req.user?.sub || req.user?.userId;
+    return this.adminService.getProfile(userId);
+  }
+
+  @Patch('profile')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update admin own profile' })
+  async updateProfile(@Req() req: any, @Body() body: any) {
+    const userId = req.user?.sub || req.user?.userId;
+    return this.adminService.updateProfile(userId, body);
+  }
+
+  // -------------------------------------------------------------
+  // Employees
+  // -------------------------------------------------------------
+  @Get('employees')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'View all employee data' })
+  async getAllEmployees(@Query() query: any) {
+    return this.adminService.getAllEmployees(query);
+  }
+
+  @Get('employees/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'View single employee data' })
+  @ApiParam({ name: 'id', description: 'Employee ID' })
+  async getEmployeeById(@Param('id') id: string) {
+    return this.adminService.getEmployeeById(id);
+  }
+
+  @Patch('employees/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Edit employee data' })
+  @ApiParam({ name: 'id', description: 'Employee ID' })
+  async updateEmployee(@Param('id') id: string, @Body() body: any) {
+    return this.adminService.updateEmployee(id, body);
+  }
+
+  @Post('employees/:id/delete')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete employee data (soft)' })
+  @ApiParam({ name: 'id', description: 'Employee ID' })
+  async deleteEmployee(@Param('id') id: string) {
+    return this.adminService.deleteEmployee(id);
+  }
+
+  @Patch('employees/:id/role')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Assign or change an employee role' })
+  @ApiParam({ name: 'id', description: 'Employee ID' })
+  async assignEmployeeRole(@Param('id') id: string, @Body() body: { role: string }) {
+    return this.adminService.assignEmployeeRole(id, body.role);
+  }
+
+  // -------------------------------------------------------------
+  // Roles
+  // -------------------------------------------------------------
+  @Get('roles')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List all roles' })
+  async getRoles() {
+    return this.adminService.getRoles();
+  }
+
+  @Post('roles')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create role (with permissions)' })
+  async createRole(@Body() dto: { name: string; description?: string; permissions?: any }) {
+    return this.adminService.createRole(dto);
+  }
+
+  @Patch('roles/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Edit role' })
+  @ApiParam({ name: 'id', description: 'Role ID' })
+  async updateRole(@Param('id') id: string, @Body() body: any) {
+    return this.adminService.updateRole(id, body);
+  }
+
+  @Post('roles/:id/delete')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete role (blocked if users are assigned)' })
+  @ApiParam({ name: 'id', description: 'Role ID' })
+  async deleteRole(@Param('id') id: string) {
+    return this.adminService.deleteRole(id);
+  }
+
+  // -------------------------------------------------------------
+  // Accounts
+  // -------------------------------------------------------------
+  @Get('accounts')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List all accounts' })
+  async getAccounts() {
+    return this.adminService.getAccounts();
+  }
+
+  @Post('accounts')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create account (username, email, role, temporary password)' })
+  async createAccount(
+    @Body() dto: { username?: string; email: string; role: string; first_name?: string; last_name?: string },
+  ) {
+    return this.adminService.createAccount(dto);
+  }
+
+  @Patch('accounts/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update account details, status, reset password' })
+  @ApiParam({ name: 'id', description: 'User/Account ID' })
+  async updateAccount(@Param('id') id: string, @Body() body: any) {
+    return this.adminService.updateAccount(id, body);
+  }
+
+  @Post('accounts/:id/delete')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete or deactivate account' })
+  @ApiParam({ name: 'id', description: 'User/Account ID' })
+  async deleteAccount(@Param('id') id: string, @Body() body: { action?: 'delete' | 'deactivate' }) {
+    return this.adminService.deleteOrDeactivateAccount(id, body.action || 'deactivate');
+  }
+
+  // -------------------------------------------------------------
+  // Requests
+  // -------------------------------------------------------------
+  @Get('requests')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List HR requests with optional status filter' })
+  async getRequests(@Query('status') status?: string) {
+    return this.adminService.getRequests(status);
+  }
+
+  @Patch('requests/:id/decision')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Approve or reject request with comment' })
+  @ApiParam({ name: 'id', description: 'Request ID' })
+  async decideRequest(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() dto: { decision: 'APPROVED' | 'REJECTED'; comment?: string },
+  ) {
+    const adminUserId = req.user?.sub || req.user?.userId;
+    return this.adminService.decideRequest(id, adminUserId, dto);
+  }
+
+  // -------------------------------------------------------------
+  // Dashboard
+  // -------------------------------------------------------------
+  @Get('dashboard')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'System statistics' })
+  async getDashboard() {
+    return this.adminService.getDashboardStats();
+  }
+
+  @Patch('dashboard')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Edit dashboard widget configuration' })
+  async updateDashboard(@Body() body: { widgets: any }) {
+    return this.adminService.updateDashboardWidgets(body.widgets);
+  }
+
+  // -------------------------------------------------------------
+  // Notifications
+  // -------------------------------------------------------------
+  @Get('notifications')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get admin notifications' })
+  async getNotifications() {
+    return this.adminService.getAdminNotifications();
+  }
 }

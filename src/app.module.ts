@@ -12,6 +12,8 @@ import { EmployeeModule } from './employee/employee.module';
 import { DepartmentModule } from './departments/department.module';
 import { PositionsModule } from './positions/positions.module';
 import { HrModule } from './hr/hr.module';
+import { MeModule } from './me/me.module';
+import { SupervisorModule } from './supervisor/supervisor.module';
 import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
@@ -30,6 +32,8 @@ import { NotificationsModule } from './notifications/notifications.module';
     DepartmentModule,
     PositionsModule,
     HrModule,
+    MeModule,
+    SupervisorModule,
     NotificationsModule,
   ],
   controllers: [AppController],

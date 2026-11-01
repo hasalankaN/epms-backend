@@ -5,6 +5,7 @@ import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
 import { DatabaseModule } from '../database/database.module';
 import { EmailModule } from '../email/email.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { EmailModule } from '../email/email.module';
     JwtModule.register({ global: true }),
     DatabaseModule,
     EmailModule,
+    NotificationsModule,
   ],
   controllers: [AdminController],
   providers: [AdminService],

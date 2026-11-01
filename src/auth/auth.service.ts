@@ -9,7 +9,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, gt, sql } from 'drizzle-orm';
+import { eq, and, gt, sql, or, isNull } from 'drizzle-orm';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { FirebaseService } from '../firebase/firebase.service';
@@ -132,15 +132,24 @@ export class AuthService {
         .returning();
 
       newUser = created;
-    } catch (error) {
+    } catch (error: unknown) {
+      const err = error as {
+        message?: string;
+        detail?: string;
+        code?: string;
+        hint?: string;
+        stack?: string;
+      };
+
       console.error('[AuthService] DB insert error:', {
-        message: error?.message,
-        detail: error?.detail,
-        code: error?.code,
-        hint: error?.hint,
-        stack: error?.stack,
+        message: err.message,
+        detail: err.detail,
+        code: err.code,
+        hint: err.hint,
+        stack: err.stack,
       });
-      throw new InternalServerErrorException('Database insert failed: ' + (error?.detail || error?.message || 'unknown'));
+
+      throw new InternalServerErrorException('Database insert failed: ' + (err.detail || err.message || 'unknown'));
     }
 
     // Send OTP email
@@ -464,6 +473,9 @@ export class AuthService {
       email: dto.email,
       otp_hash: otpHash,
       expires_at: expiresAt,
+      is_used: false,
+      attempts: 0,
+      created_at: new Date(),
     });
 
     // Send OTP email
@@ -485,7 +497,10 @@ export class AuthService {
       .where(
         and(
           eq(schema.passwordResetOtps.email, dto.email),
-          eq(schema.passwordResetOtps.is_used, false),
+          or(
+            eq(schema.passwordResetOtps.is_used, false),
+            isNull(schema.passwordResetOtps.is_used),
+          ),
         ),
       )
       .orderBy(schema.passwordResetOtps.created_at);
@@ -529,6 +544,8 @@ export class AuthService {
       token: resetToken,
       associated_otp_id: otpRecord.id,
       expires_at: tokenExpiresAt,
+      is_used: false,
+      created_at: new Date(),
     });
 
     return {
@@ -549,7 +566,10 @@ export class AuthService {
       where: and(
         eq(schema.passwordResetTokens.email, dto.email),
         eq(schema.passwordResetTokens.token, dto.resetToken),
-        eq(schema.passwordResetTokens.is_used, false),
+        or(
+          eq(schema.passwordResetTokens.is_used, false),
+          isNull(schema.passwordResetTokens.is_used),
+        ),
       ),
     });
 
@@ -575,7 +595,7 @@ export class AuthService {
         });
       } catch (error) {
         // If Firebase user doesn't exist, create one
-        if (error.message.includes('user-not-found')) {
+        if (error instanceof Error && error.message.includes('user-not-found')) {
           await this.firebaseService.createUser({
             uid: user.firebase_uid,
             email: dto.email,

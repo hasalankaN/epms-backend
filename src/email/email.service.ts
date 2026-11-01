@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as SibApiV3Sdk from 'sib-api-v3-sdk';
+import { getAppName } from '../common/app-name';
 
 export interface EmailOptions {
   to: string;
@@ -12,20 +13,19 @@ export interface EmailOptions {
 @Injectable()
 export class EmailService {
   private readonly apiClient: SibApiV3Sdk.TransactionalEmailsApi;
+  private readonly appName: string;
   private readonly fromEmail: string;
   private readonly fromName: string;
   private readonly isConfigured: boolean;
 
   constructor(private readonly configService: ConfigService) {
     const apiKey = this.configService.get<string>('BREVO_API_KEY');
+    this.appName = getAppName(this.configService);
     this.fromEmail =
       this.configService.get<string>('BREVO_SENDER_EMAIL') ||
       this.configService.get<string>('EMAIL_FROM') ||
       'no-reply@epms.example';
-    this.fromName =
-      (this.configService.get<string>('BREVO_SENDER_NAME') ||
-        this.configService.get<string>('EMAIL_FROM_NAME'))?.replace(/"/g, '') ||
-      'EPMS';
+    this.fromName = this.appName;
 
     this.isConfigured = !!apiKey;
 
@@ -46,7 +46,7 @@ export class EmailService {
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Fitness Coaching</title>
+        <title>${this.appName}</title>
         <style>
           * {
             margin: 0;
@@ -216,15 +216,15 @@ export class EmailService {
       <body>
         <div class="email-container">
           <div class="email-header">
-            <div class="email-logo">SourceCode</div>
-            <div class="email-tagline">Employee Managment System</div>
+            <div class="email-logo">${this.appName}</div>
+            <div class="email-tagline">Employee Management System</div>
           </div>
           <div class="email-body">
             ${content}
           </div>
           <div class="email-footer">
             <div class="footer-text">
-              © ${new Date().getFullYear()} Employee Managment System. All rights reserved.<br>
+              © ${new Date().getFullYear()} ${this.appName}. All rights reserved.<br>
               This email was sent to you as part of your account activity.
             </div>
             <div class="divider"></div>
@@ -246,7 +246,7 @@ export class EmailService {
     const content = `
       <div class="email-content">
         <p>Hi${name ? ' ' + name : ''},</p>
-        <p>Thank you for joining <strong>SourceCode</strong>! We're excited to have you on board.</p>
+        <p>Thank you for joining <strong>${this.appName}</strong>! We're excited to have you on board.</p>
         <p>To complete your registration and verify your email address, please use the verification code below:</p>
       </div>
       
@@ -261,11 +261,11 @@ export class EmailService {
       </div>
       
       <div class="email-content">
-        <p>If you didn't create an account with SourceCode, please ignore this email or contact our support team if you have concerns.</p>
-        <p>Welcome to your fitness journey!</p>
+        <p>If you didn't create an account with ${this.appName}, please ignore this email or contact our support team if you have concerns.</p>
+        <p>Welcome to your employee account.</p>
         <p style="margin-top: 30px;">
           Best regards,<br>
-          <strong style="color: #7F435F;">The SourceCode Team</strong>
+          <strong style="color: #7F435F;">The ${this.appName} Team</strong>
         </p>
       </div>
     `;
@@ -273,7 +273,7 @@ export class EmailService {
     await this.sendEmail({
       to: email,
       toName: name,
-      subject: '🔐 Verify Your Email Address - EPMS',
+      subject: `🔐 Verify Your Email Address - ${this.appName}`,
       htmlContent: this.getEmailTemplate(content),
     });
   }
@@ -285,7 +285,7 @@ export class EmailService {
     const content = `
       <div class="email-content">
         <p>Hi${name ? ' ' + name : ''},</p>
-        <p>We received a request to reset your password for your <strong>Fitness Coaching</strong> account.</p>
+        <p>We received a request to reset your password for your <strong>${this.appName}</strong> account.</p>
         <p>Use the code below to reset your password:</p>
       </div>
       
@@ -303,7 +303,7 @@ export class EmailService {
         <p>Once you enter this code, you'll be able to create a new password for your account.</p>
         <p style="margin-top: 30px;">
           Best regards,<br>
-          <strong style="color: #7F435F;">SourceCode Team</strong>
+          <strong style="color: #7F435F;">${this.appName} Team</strong>
         </p>
       </div>
     `;
@@ -311,7 +311,7 @@ export class EmailService {
     await this.sendEmail({
       to: email,
       toName: name,
-      subject: '🔑 Reset Your Password - SourceCode',
+      subject: `🔑 Reset Your Password - ${this.appName}`,
       htmlContent: this.getEmailTemplate(content),
     });
   }
@@ -324,7 +324,7 @@ export class EmailService {
       <div class="email-content">
         <p>Hi ${name},</p>
         <p>🎉 <strong>Congratulations!</strong> Your email has been successfully verified, and your account is now active.</p>
-        <p>You're all set to start your fitness transformation journey with <strong>SourceCode</strong>!</p>
+        <p>Your account is ready to use in <strong>${this.appName}</strong>.</p>
       </div>
       
       <div style="text-align: center; margin: 30px 0;">
@@ -336,22 +336,22 @@ export class EmailService {
       <div class="email-content">
         <p><strong>What's next?</strong></p>
         <ul style="padding-left: 20px; margin: 15px 0;">
-          <li style="margin-bottom: 10px;">Complete your profile to get personalized recommendations</li>
-          <li style="margin-bottom: 10px;">Browse our extensive workout library</li>
-          <li style="margin-bottom: 10px;">Connect with certified trainers</li>
-          <li style="margin-bottom: 10px;">Track your progress and achieve your goals</li>
+          <li style="margin-bottom: 10px;">Review and complete your employee profile</li>
+          <li style="margin-bottom: 10px;">Check your department and position details</li>
+          <li style="margin-bottom: 10px;">Keep your contact information up to date</li>
+          <li style="margin-bottom: 10px;">Contact your administrator if you need help</li>
         </ul>
       </div>
       
       <div class="info-box">
-        <p><strong>💡 Pro Tip:</strong> Set up your fitness goals and preferences in your profile for a customized experience!</p>
+        <p><strong>💡 Tip:</strong> Keep your profile information up to date.</p>
       </div>
       
       <div class="email-content">
         <p>If you have any questions or need assistance, our support team is here to help.</p>
         <p style="margin-top: 30px;">
           Let's get moving!<br>
-          <strong style="color: #7F435F;">The Fitness Coaching Team</strong>
+          <strong style="color: #7F435F;">The ${this.appName} Team</strong>
         </p>
       </div>
     `;
@@ -359,7 +359,7 @@ export class EmailService {
     await this.sendEmail({
       to: email,
       toName: name,
-      subject: '🎉 Welcome to Fitness Coaching - Let\'s Get Started!',
+      subject: `🎉 Welcome to ${this.appName}`,
       htmlContent: this.getEmailTemplate(content),
     });
   }
@@ -371,7 +371,7 @@ export class EmailService {
     const content = `
       <div class="email-content">
         <p>Hi${name ? ' ' + name : ''},</p>
-        <p>This email confirms that your password for <strong>SourceCode</strong> has been successfully changed.</p>
+        <p>This email confirms that your password for <strong>${this.appName}</strong> has been successfully changed.</p>
       </div>
       
       <div class="info-box">
@@ -392,7 +392,7 @@ export class EmailService {
         <p>If you have any concerns or questions about your account security, please reach out to our support team.</p>
         <p style="margin-top: 30px;">
           Stay secure,<br>
-          <strong style="color: #7F435F;">SourceCode Team</strong>
+          <strong style="color: #7F435F;">${this.appName} Team</strong>
         </p>
       </div>
     `;
@@ -400,7 +400,7 @@ export class EmailService {
     await this.sendEmail({
       to: email,
       toName: name,
-      subject: '✅ Your Password Has Been Changed - SourceCode',
+      subject: `✅ Your Password Has Been Changed - ${this.appName}`,
       htmlContent: this.getEmailTemplate(content),
     });
   }

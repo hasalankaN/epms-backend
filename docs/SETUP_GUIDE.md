@@ -73,8 +73,10 @@ OTP_SECRET=<generated-secret-3>
    ```env
    BREVO_API_KEY=xkeysib-your-key
    BREVO_SENDER_EMAIL=noreply@yourdomain.com
-   BREVO_SENDER_NAME=Your App Name
+  APP_NAME=EPMS
    ```
+
+  Set `APP_NAME` to the name shown in the email sender label, email content, email subjects, and API documentation.
 
 ### 3. Database Setup
 

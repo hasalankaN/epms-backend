@@ -7,6 +7,7 @@ import { DATABASE_CONNECTION } from '../database/database.module';
 import { CreateDepartmentDto } from './dto/create-departments.dto';
 import { DepartmentQueryDto } from './dto/department-query.dto';
 import { UpdateDepartmentDto } from './dto/update-department.dto';
+import { generateDepartmentCode } from '../common/utils/code-generator.util';
 
 @Injectable()
 export class DepartmentService {
@@ -25,9 +26,22 @@ export class DepartmentService {
                 throw new ConflictException('Department with this name already exists');
             }
 
+            let departmentCode = dto.departmentCode?.trim();
+            if (departmentCode) {
+                const existingCode = await this.db.query.departments.findFirst({
+                    where: eq(schema.departments.departmentCode, departmentCode),
+                });
+                if (existingCode) {
+                    throw new ConflictException('Department code already exists');
+                }
+            } else {
+                departmentCode = await generateDepartmentCode(this.db);
+            }
+
             const [newDepartment] = await this.db
                 .insert(schema.departments)
                 .values({
+                    departmentCode,
                     departmentName: dto.departmentName,
                     location: dto.location,
                     deptPhone: dto.deptPhone,
@@ -60,6 +74,7 @@ export class DepartmentService {
                 const searchPattern = `%${query.search.trim()}%`;
                 conditions.push(
                     or(
+                        ilike(schema.departments.departmentCode, searchPattern),
                         ilike(schema.departments.departmentName, searchPattern),
                         ilike(schema.departments.location, searchPattern),
                         ilike(schema.departments.deptPhone, searchPattern)
